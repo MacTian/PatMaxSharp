@@ -34,7 +34,58 @@ All parameters, formulas, and data structures are recovered from reverse enginee
 
 ---
 
-## 3. Project Structure
+## 3. Desktop UI (WPF)
+
+A full **WPF desktop application** `PatMaxSharp.UI` is included:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Open Image | Train | Run | Clear            Status: Trained ✓ │
+├────────────┬─────────────────────────────────────────────────┤
+│ 1.Regions  │                                                 │
+│  Train(green)│        Image viewer (wheel zoom / drag)       │
+│  Search(cyan)│     green box = train region, cyan = search   │
+├────────────┤                                                 │
+│ 2.Search   │                                                 │
+│  rotation  │                                                 │
+│  scale     │                                                 │
+├────────────┴─────────────────────────────────────────────────┤
+│ 3.Scoring  4.Performance/Accuracy                             │
+├──────────────────────────────────────────────────────────────┤
+│ Results (DataGrid)                                           │
+│ # │ Score │ Coverage │ X │ Y │ Angle │ Scale │ Features │ OK │
+└────┴───────┴──────────┴───┴───┴───────┴───────┴──────────┴────┘
+```
+
+### Supported image formats
+`BMP` / `PNG` / `JPG` / `JPEG` / `TIF` / `TIFF` / `GIF`
+
+### Parameters
+
+| Group | Parameters |
+|---|---|
+| **Regions** | Train region (green), Search region (cyan), selection mode |
+| **Search** | Rotation range, scale range, expected count, XY overlap, timeout |
+| **Scoring** | Accept threshold, contrast threshold, grain, coarse/fine grain, clutter, max results |
+| **Performance** | Accumulator step, sub-pixel refinement, clustering, Gaussian pre-smooth, SIMD, parallel |
+
+### Run
+
+```bash
+cd PatMaxSharp
+dotnet run -c Release --project PatMaxSharp.UI
+```
+
+**Workflow**:
+1. Open image → drag to select the **train region** (green)
+2. Switch to "search region" and drag the **search region** (cyan, optional)
+3. Set parameters (rotation / scale / thresholds)
+4. Click **Train Model**
+5. Click **Run Match** → results grid shows position, angle, scale, score, coverage
+
+---
+
+## 4. Project Structure
 
 ```
 PatMaxSharp/
@@ -56,12 +107,16 @@ PatMaxSharp/
 ├── Transform/
 │   └── XformTps.cs          Thin-plate spline (PatFlex)
 ├── PatMaxTool.cs            Train + Run pipeline
-└── Program.cs               Full demo
+├── Program.cs               Full demo (console)
+└── PatMaxSharp.UI/          ★ WPF desktop app
+    ├── MainWindow.xaml      Main window (params + image + results grid)
+    ├── ViewModels/          MainViewModel
+    └── Controls/            ImageRegionSelector (region selection)
 ```
 
 ---
 
-## 4. Core Algorithms (Recovered)
+## 5. Core Algorithms (Recovered)
 
 ### 4.1 Gabor Edge Detection
 ```
@@ -111,7 +166,7 @@ output [tx, ty, m00, m01, m10, m11, det]
 
 ---
 
-## 5. Run
+## 6. Run
 
 ```bash
 cd PatMaxSharp
@@ -142,7 +197,7 @@ PatFlex thin-plate spline (TPS):
 
 ---
 
-## 6. Performance & Optimization
+## 7. Performance & Optimization
 
 ### 6.1 Benchmark (256x256, 12-orientation Gabor)
 
@@ -171,7 +226,7 @@ PatFlex thin-plate spline (TPS):
 
 ---
 
-## 7. Tunable Parameters
+## 8. Tunable Parameters
 
 ```csharp
 // Precision
@@ -190,7 +245,7 @@ edge.UseParallel = true;             // parallel
 
 ---
 
-## 8. Differences from the Original
+## 9. Differences from the Original
 
 | Aspect | This implementation | Cognex original |
 |---|---|---|
@@ -202,7 +257,7 @@ edge.UseParallel = true;             // parallel
 
 ---
 
-## 9. Reverse-Engineering Corpus
+## 10. Reverse-Engineering Corpus
 
 The supporting reverse-engineering artifacts (900+ decompiled functions, 1695 class names, 6 component reports):
 
@@ -216,7 +271,7 @@ The supporting reverse-engineering artifacts (900+ decompiled functions, 1695 cl
 
 ---
 
-## 10. License
+## 11. License
 
 MIT License — for learning and research purposes only.
 
