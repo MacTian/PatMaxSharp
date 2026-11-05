@@ -10,4 +10,10 @@
     <RootNamespace>PatMaxSharp</RootNamespace>
   </PropertyGroup>
 
+  <!-- The WPF UI is a separate project; do not compile its sources here -->
+  <ItemGroup>
+    <Compile Remove="PatMaxSharp.UI\**" />
+    <None Remove="PatMaxSharp.UI\**" />
+  </ItemGroup>
+
 </Project>
