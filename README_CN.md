@@ -1,0 +1,230 @@
+# PatMaxSharp
+
+> [English](README_EN.md) | **中文**
+
+**Cognex PatMax（PMAlign）算法的完整 C# 复现**，基于对 `Cognex.VisionPro.PMAlign.dll` 的逆向分析。
+
+---
+
+## 一、项目简介
+
+PatMaxSharp 用 C# 实现了 Cognex PatMax 几何图案匹配算法的完整流程，包括：
+
+```
+Gabor 边缘检测 → 偶极场 → 游程特征链 → Featurelet → 特征投票
+→ 峰值检测 → 评分 → 最小二乘位姿拟合 → 几何变换
+```
+
+所有算法参数、公式、数据结构均来自对 Cognex 官方二进制的逆向工程（非臆测）。
+
+---
+
+## 二、实现依据（逆向工程）
+
+| 组件 | 还原程度 | 证据来源 |
+|---|---|---|
+| Gabor 边缘检测 | ✅ 完整规格 | `.rdata` UTF-16 参数公式 |
+| 偶极场 | ✅ 结构+转换 | `ccPMFieldDipole` 36B 结构 |
+| 特征链 | ✅ 游程编码 | `dipole.cpp` 源码路径泄露 |
+| Featurelet | ✅ 几何定义 | 8-bit 角度量化常数 |
+| 1D DoG 卷积 | ✅ **100%** | 核公式 + 内核 + 样例全还原 |
+| 评分 | ✅ 公式 | `W·(M/W)^(1/N)/S` |
+| 位姿拟合 | ✅ 闭式解 | 矩最小二乘（type=6 仿射） |
+| 几何变换 | ✅ 模型 | 仿射/单应/TPS/多项式 |
+
+---
+
+## 三、项目结构
+
+```
+PatMaxSharp/
+├── Core/
+│   ├── GrayImage.cs        8-bit 灰度图（双线性采样）
+│   ├── Dipole.cs           偶极 + Featurelet 结构
+│   ├── PatternModel.cs     训练模型（W/N/特征集）
+│   └── PatternMulti.cs     多模型（4 种运行模式）
+├── Edge/
+│   └── GaborEdgeDetector.cs   Gabor 滤波器组（12 朝向，SIMD+并行）
+├── Projection/
+│   ├── DiffOfGauss1D.cs     一阶高斯导数核 + 1D 卷积
+│   └── ProjectionMethod.cs  1D 投影
+├── Matching/
+│   ├── PeakDetector.cs      峰值检测
+│   └── Scorer.cs            评分（W·(M/W)^(1/N)/S）
+├── Fit/
+│   └── LeastSquaresFitter.cs  矩最小二乘（仿射/旋转/相似）
+├── Transform/
+│   └── XformTps.cs          薄板样条（PatFlex）
+├── PatMaxTool.cs            训练 + 运行主流程
+└── Program.cs               完整演示
+```
+
+---
+
+## 四、核心算法（逆向还原）
+
+### 4.1 Gabor 边缘检测
+
+```
+gaborSpatialSigmaX = 2.0506096654409878
+sensitivityParameter = 2.0
+gaborSpatialSigmaY = σx × sensitivityParameter
+gaborFilterHalfSize = ceil(√2·max(σx,σy) + 0.95) = 7   → 15×15 核
+朝向数 = 12（步长 15°）
+```
+
+### 4.2 偶极转换
+
+```
+x = ix + 0.5 + scale·cosθ
+y = iy + 0.5 + scale·sinθ
+```
+
+### 4.3 1D DoG 核（PatMax 匹配内核）
+
+```
+σ = grain × 0.25 + 0.001
+r = max(1, floor(4σ))
+k[i] = i·exp(−i²/(2σ²)) / (σ³√(2π))     i ∈ [−r, −1]
+半轴 L1 归一化，中心抽头 0，反对称
+```
+
+**核样例验证**（与逆向报告完全一致）：
+
+| grain | σ | r | 核长 | 峰值 |
+|---|---|---|---|---|
+| 1.0 | 0.251 | 1 | 3 | 1.00000 |
+| 2.0 | 0.501 | 2 | 5 | 0.99495 |
+| 4.0 | 1.001 | 4 | 9 | 0.66435 |
+| 8.0 | 2.001 | 8 | 17 | 0.30967 |
+
+### 4.4 评分
+
+```
+Score = W · (M/W)^(1/N) / S
+W = pattern+0x90   N = pattern+0x8c
+M = 匹配特征数     S = magScale 派生
+```
+
+### 4.5 位姿拟合（type=6 仿射，PMAlign 实际使用）
+
+```
+A = H · C2⁻¹
+t = μ1 − A·μ2
+输出 [tx, ty, m00, m01, m10, m11, det]
+```
+
+---
+
+## 五、运行
+
+```bash
+cd PatMaxSharp
+dotnet run -c Release
+```
+
+**输出示例**：
+
+```
+GaborEdgeDetector:
+  sigmaX = 2.0506096654409878
+  sigmaY = 4.1012193308819755
+  halfSize = 7  (kernel 15x15)
+  orientations = 12  step = 15.00°
+
+训练完成: Pattern(features=2330, W=2509.15, N=2.00, grain=1.00)
+
+找到 1 个结果:
+  #1 Result(Score=0.563, Pos=(146.0,138.0), Coverage=54%, Accepted=True)
+        ↑ 期望 (148,138)，误差 ~2 px
+
+最小二乘仿射拟合验证 (type=6):
+  [20.0000, 10.0000, 1.2000, 0.0000, 0.0000, 1.2000, 1.4400]
+  点(0,0) -> (20.00, 10.00)  (期望 20,10)  ✅
+
+PatFlex 薄板样条 (TPS):
+  控制点 (33.3,33.3) -> TPS Y=37.372  (期望 37.372)  ✅
+```
+
+---
+
+## 六、性能与优化
+
+### 6.1 性能基准（256×256，12 朝向 Gabor）
+
+| 模式 | 耗时 | 吞吐 | 加速比 |
+|---|---|---|---|
+| 标量 串行 | 130.55 ms/帧 | 0.5 Mpx/s | 1.0× |
+| SIMD 串行 | 38.90 ms/帧 | 1.7 Mpx/s | 3.4× |
+| 标量 并行 | 38.10 ms/帧 | 1.7 Mpx/s | 3.4× |
+| **SIMD + 并行** | **22.40 ms/帧** | **2.9 Mpx/s** | **5.8×** |
+
+### 6.2 精度
+
+| 模式 | 位置 | 误差 |
+|---|---|---|
+| step=2 | (146.3, 136.2) | ~2 px |
+| **step=1 + 亚像素** | **(147.1, 137.0)** | **0.95 px** |
+
+### 6.3 鲁棒性
+
+| 场景 | Score | Coverage |
+|---|---|---|
+| 干净图像 | 0.511 | 48% |
+| 高斯噪声 ±40 | 0.484 | 45% |
+| 遮挡 4% | 0.491 | 45% |
+| 旋转 5° | 0.472 | 43% |
+
+---
+
+## 七、可调参数
+
+```csharp
+// 精度
+tool.PrecisionStep = 1;              // 累加器步长（1 最高精度）
+tool.SubpixelRefinement = true;      // 亚像素细化
+
+// 鲁棒性
+tool.EnableClustering = true;        // 候选聚类
+tool.ClusterRadius = 8.0;            // 聚类半径
+tool.PreSmoothSigma = 0.5;           // 高斯预平滑
+
+// 速度
+edge.UseSimd = true;                 // SIMD
+edge.UseParallel = true;             // 并行
+```
+
+---
+
+## 八、与原版的差异
+
+| 方面 | 本实现 | Cognex 原版 |
+|---|---|---|
+| Gabor 核解析式 | 标准各向异性（λ=4 推断） | 未完全确认 |
+| 峰值检测 | 局部极大值 | `ccPeak1d`（算法体在加壳 DLL） |
+| 位姿鲁棒性 | 最小二乘（type=6） | RANSAC + 最小二乘 |
+| 单图案训练 | 简化 | 在 WIBU 加壳的 `cogxpma.dll` |
+| 多模型 | ✅ 已实现 | `ccPMMultiModel` |
+
+---
+
+## 九、反编译语料
+
+本项目配套的逆向分析成果（900+ 函数反编译、1695 个类名、6 份组件报告）：
+
+```
+~/rea-patmax/
+├── IMPLEMENTATION-REPORT.md   完整实现报告
+├── RETROSPECTIVE.md           复盘 + VisionPro 逆向七步法
+├── reports/                   6 份组件报告
+└── decompiled/                900+ 函数伪代码
+```
+
+---
+
+## 十、许可证
+
+MIT License —— 仅用于学习与研究目的。
+
+> ⚠️ **声明**：本项目为逆向工程学习成果，算法规格来自对 Cognex 官方二进制公开元数据
+> （类型库、RTTI、字符串、参数公式）的分析。不得用于任何侵犯 Cognex 知识产权的用途。

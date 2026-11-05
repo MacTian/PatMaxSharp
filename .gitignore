@@ -1,0 +1,16 @@
+# Build
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+
+# .NET
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+
+# OS
+.DS_Store
+Thumbs.db
