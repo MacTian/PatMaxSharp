@@ -435,7 +435,12 @@ public sealed class PatMaxTool
         tEnergy = Math.Sqrt(tEnergy);
 
         int maxX = w - tw, maxY = h - th;
-        int coarse = Math.Max(2, PrecisionStep * 2);
+        // Downsample for the coarse pass (4x) to make it fast.
+        int ds = Math.Max(2, Math.Min(6, PrecisionStep * 3));
+        var (magDs, wDs, hDs, twDs, thDs) = Downsample(mag, w, h, tw, th, ds);
+        int maxXDs = wDs - twDs, maxYDs = hDs - thDs;
+
+        int coarse = Math.Max(1, PrecisionStep);
         double bestScore = -1;
         int bestX = 0, bestY = 0; double bestAngle = 0;
 
@@ -471,26 +476,36 @@ public sealed class PatMaxTool
             for (int i = 0; i < rt.Length; i++) rtEnergy += rt[i] * rt[i];
             if (rtEnergy <= 1e-9) continue;
             rtEnergy = Math.Sqrt(rtEnergy);
+            // downsample the rotated template for the coarse pass
+            var rtDs = new float[twDs * thDs];
+            for (int y = 0; y < thDs; y++)
+                for (int x = 0; x < twDs; x++)
+                    rtDs[y * twDs + x] = rt[(y * ds) * tw + (x * ds)];
+            double rtDsEnergy = 0;
+            for (int i = 0; i < rtDs.Length; i++) rtDsEnergy += rtDs[i] * rtDs[i];
+            if (rtDsEnergy <= 1e-9) continue;
+            rtDsEnergy = Math.Sqrt(rtDsEnergy);
 
-            for (int oy = 0; oy <= maxY; oy += coarse)
+            if (maxXDs < 0) continue;
+            for (int oy = 0; oy <= maxYDs; oy += coarse)
             {
-                for (int ox = 0; ox <= maxX; ox += coarse)
+                for (int ox = 0; ox <= maxXDs; ox += coarse)
                 {
                     double dot = 0, iEnergy = 0;
-                    for (int ty = 0; ty < th; ty++)
+                    for (int ty = 0; ty < thDs; ty++)
                     {
-                        int row = (oy + ty) * w + ox;
-                        int tRow = ty * tw;
-                        for (int tx = 0; tx < tw; tx++)
+                        int row = (oy + ty) * wDs + ox;
+                        int tRow = ty * twDs;
+                        for (int tx = 0; tx < twDs; tx++)
                         {
-                            float iv = mag[row + tx];
-                            dot += rt[tRow + tx] * iv;
+                            float iv = magDs[row + tx];
+                            dot += rtDs[tRow + tx] * iv;
                             iEnergy += iv * iv;
                         }
                     }
-                    double denom = rtEnergy * Math.Sqrt(iEnergy);
+                    double denom = rtDsEnergy * Math.Sqrt(iEnergy);
                     double cc = denom > 1e-9 ? dot / denom : 0;
-                    if (cc > bestScore) { bestScore = cc; bestX = ox; bestY = oy; bestAngle = ang; }
+                    if (cc > bestScore) { bestScore = cc; bestX = ox * ds; bestY = oy * ds; bestAngle = ang; }
                 }
             }
         }
@@ -631,6 +646,30 @@ public sealed class PatMaxTool
         }
         results.Sort((a, b) => b.Score.CompareTo(a.Score));
         return results;
+    }
+
+    private static (float[] mag, int w, int h, int tw, int th) Downsample(
+        float[] src, int sw, int sh, int stw, int sth, int ds)
+    {
+        int w = Math.Max(1, sw / ds), h = Math.Max(1, sh / ds);
+        int tw = Math.Max(1, stw / ds), th = Math.Max(1, sth / ds);
+        var dst = new float[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                double acc = 0; int cnt = 0;
+                for (int dy = 0; dy < ds; dy++)
+                {
+                    int sy = y * ds + dy; if (sy >= sh) break;
+                    for (int dx = 0; dx < ds; dx++)
+                    {
+                        int sx = x * ds + dx; if (sx >= sw) break;
+                        acc += src[sy * sw + sx]; cnt++;
+                    }
+                }
+                dst[y * w + x] = cnt > 0 ? (float)(acc / cnt) : 0f;
+            }
+        return (dst, w, h, tw, th);
     }
 
     private static (double, double, double) FindPeak(double[,] acc, int w, int h, int step)
