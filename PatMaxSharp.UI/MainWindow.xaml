@@ -181,7 +181,8 @@
 
                 <!-- Results -->
                 <GroupBox Grid.Row="1" Header="匹配结果">
-                    <DataGrid ItemsSource="{Binding Results}" AutoGenerateColumns="False"
+                    <DataGrid x:Name="resultsGrid" ItemsSource="{Binding Results}" AutoGenerateColumns="False"
+                              SelectedItem="{Binding SelectedResult}"
                               IsReadOnly="True" Background="#1E1E1E" Foreground="#EEE"
                               RowBackground="#252526" AlternatingRowBackground="#2D2D30"
                               GridLinesVisibility="Horizontal" HeadersVisibility="Column"

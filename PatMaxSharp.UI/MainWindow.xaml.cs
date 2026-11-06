@@ -25,6 +25,12 @@ public partial class MainWindow : Window
                 timeText.Text = $"{_vm.ProcessingTimeMs:F1}";
             if (e.PropertyName == nameof(MainViewModel.ThroughputMpxs))
                 tputText.Text = $"{_vm.ThroughputMpxs:F2}";
+            if (e.PropertyName == nameof(MainViewModel.SelectedResult))
+            {
+                int idx = _vm.Results.IndexOf(_vm.SelectedResult);
+                viewer.SelectedIndex = idx;
+                resultsGrid.ScrollIntoView(_vm.SelectedResult);
+            }
         };
     }
 }

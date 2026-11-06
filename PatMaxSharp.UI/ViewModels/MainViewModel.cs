@@ -88,6 +88,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     /// <summary>Last run throughput (Mpx/s).</summary>
     public double ThroughputMpxs { get; private set; }
+
+    /// <summary>Currently selected result (highlights the marker on the image).</summary>
+    public MatchResult SelectedResult { get; set; }
     #endregion
 
     private void OpenImage()

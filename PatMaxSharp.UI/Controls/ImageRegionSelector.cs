@@ -103,6 +103,17 @@ public sealed class ImageRegionSelector : Control
         get => (List<MatchMarker>)GetValue(MarkersProperty);
         set => SetValue(MarkersProperty, value);
     }
+
+    /// <summary>Index of the highlighted (selected) marker. -1 = none.</summary>
+    public int SelectedIndex
+    {
+        get => (int)GetValue(SelectedIndexProperty);
+        set => SetValue(SelectedIndexProperty, value);
+    }
+
+    public static readonly DependencyProperty SelectedIndexProperty =
+        DependencyProperty.Register(nameof(SelectedIndex), typeof(int), typeof(ImageRegionSelector),
+            new PropertyMetadata(-1, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
     #endregion
 
     public event Action<Rect?>? RegionChanged;
@@ -255,36 +266,39 @@ public sealed class ImageRegionSelector : Control
                 .ToList();
             foreach (var el in toRemove) _canvas.Children.Remove(el);
 
-            foreach (var m in Markers)
+            for (int mi = 0; mi < Markers.Count; mi++)
             {
+                var m = Markers[mi];
+                bool selected = (mi == SelectedIndex);
                 var pos = m.DisplayPos(Zoom);
                 double s = m.Size * Zoom * m.Scale;
                 double a = m.AngleDeg * Math.PI / 180.0;
-                var brush = m.Accepted ? Brushes.Lime : Brushes.Orange;
+                var brush = selected ? Brushes.Yellow : (m.Accepted ? Brushes.Lime : Brushes.Orange);
+                double thickness = selected ? 4.0 : 2.0;
 
                 // cross at the match position
                 var crossH = new Line
                 {
                     X1 = pos.X - 8 * Zoom, Y1 = pos.Y, X2 = pos.X + 8 * Zoom, Y2 = pos.Y,
-                    Stroke = brush, StrokeThickness = 2
+                    Stroke = brush, StrokeThickness = thickness
                 };
                 var crossV = new Line
                 {
                     X1 = pos.X, Y1 = pos.Y - 8 * Zoom, X2 = pos.X, Y2 = pos.Y + 8 * Zoom,
-                    Stroke = brush, StrokeThickness = 2
+                    Stroke = brush, StrokeThickness = thickness
                 };
                 // angle arrow
                 var arrow = new Line
                 {
                     X1 = pos.X, Y1 = pos.Y,
                     X2 = pos.X + Math.Cos(a) * s, Y2 = pos.Y + Math.Sin(a) * s,
-                    Stroke = brush, StrokeThickness = 2
+                    Stroke = brush, StrokeThickness = thickness
                 };
                 // bounding box
                 var box = new Rectangle
                 {
                     Width = s * 2, Height = s * 2,
-                    Stroke = brush, StrokeThickness = 1.5,
+                    Stroke = brush, StrokeThickness = thickness,
                     StrokeDashArray = new DoubleCollection { 3, 2 },
                     Fill = Brushes.Transparent
                 };
