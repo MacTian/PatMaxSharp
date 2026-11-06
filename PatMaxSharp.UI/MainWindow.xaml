@@ -203,6 +203,7 @@
                         TrainRegion="{Binding TrainRegion, Mode=TwoWay}"
                         SearchRegion="{Binding SearchRegion, Mode=TwoWay}"
                         Markers="{Binding Markers}"
+                        PatternOutline="{Binding PatternOutline}"
                         ImageWidth="{Binding ImagePixelWidth}"
                         ImageHeight="{Binding ImagePixelHeight}"/>
                 </Border>

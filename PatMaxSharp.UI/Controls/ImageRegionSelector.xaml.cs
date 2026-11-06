@@ -81,6 +81,20 @@ public partial class ImageRegionSelector : UserControl
         set => SetValue(SelectedIndexProperty, value);
     }
 
+    /// <summary>
+    /// Pattern outline: featurelet positions relative to the pattern origin.
+    /// Drawn at each matched marker to visualise the matched model contour.
+    /// </summary>
+    public static readonly DependencyProperty PatternOutlineProperty =
+        DependencyProperty.Register(nameof(PatternOutline), typeof(List<Point>), typeof(ImageRegionSelector),
+            new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
+
+    public List<Point> PatternOutline
+    {
+        get => (List<Point>)GetValue(PatternOutlineProperty);
+        set => SetValue(PatternOutlineProperty, value);
+    }
+
     public static readonly DependencyProperty SelectModeProperty =
         DependencyProperty.Register(nameof(SelectMode), typeof(RegionKind), typeof(ImageRegionSelector),
             new PropertyMetadata(RegionKind.Train));
@@ -299,6 +313,24 @@ public partial class ImageRegionSelector : UserControl
             };
             Canvas.SetLeft(box, pos.X - s);
             Canvas.SetTop(box, pos.Y - s);
+
+            // matched model outline (featurelet positions relative to the origin)
+            if (PatternOutline != null && PatternOutline.Count > 1)
+            {
+                var outlineBrush = selected ? Brushes.Yellow : Brushes.Cyan;
+                for (int oi = 0; oi < PatternOutline.Count - 1; oi++)
+                {
+                    var q1 = new Point((m.X + PatternOutline[oi].X) * Zoom, (m.Y + PatternOutline[oi].Y) * Zoom);
+                    var q2 = new Point((m.X + PatternOutline[oi + 1].X) * Zoom, (m.Y + PatternOutline[oi + 1].Y) * Zoom);
+                    var seg = new Line
+                    {
+                        X1 = q1.X, Y1 = q1.Y, X2 = q2.X, Y2 = q2.Y,
+                        Stroke = outlineBrush, StrokeThickness = Math.Max(1.0, thickness * 0.6)
+                    };
+                    seg.Tag = new MatchMarkerTag();
+                    _canvas.Children.Add(seg);
+                }
+            }
 
             foreach (var el in new FrameworkElement[] { box, crossH, crossV, arrow })
                 el.Tag = new MatchMarkerTag();

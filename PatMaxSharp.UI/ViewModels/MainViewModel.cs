@@ -311,6 +311,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Markers drawn on the image (position + angle + score).</summary>
     public List<MatchMarker> Markers { get; private set; } = new();
 
+    /// <summary>Model outline (featurelet positions relative to the pattern origin).</summary>
+    public List<Point> PatternOutline { get; private set; } = new();
+
     /// <summary>Last run processing time (ms).</summary>
     public double ProcessingTimeMs { get; private set; }
 
@@ -342,8 +345,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
             ImagePixelWidth = bmp.PixelWidth;
             ImagePixelHeight = bmp.PixelHeight;
             Status = $"已加载: {System.IO.Path.GetFileName(dlg.FileName)} ({bmp.PixelWidth}×{bmp.PixelHeight})";
-            Trained = false;
+            // Keep the trained model and parameters so the user can run directly
+            // on the new image. Results from the previous image are cleared.
             Results.Clear();
+            OnPropertyChanged(nameof(Trained));
         }
         catch (Exception ex)
         {
@@ -409,6 +414,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 });
             }
             Markers = markers;
+
+            // model outline: featurelet positions relative to the pattern origin
+            if (_tool.Pattern != null)
+            {
+                PatternOutline = _tool.Pattern.Featurelets
+                    .Select(f => new Point(f.X - _tool.Pattern.OriginX, f.Y - _tool.Pattern.OriginY))
+                    .ToList();
+                OnPropertyChanged(nameof(PatternOutline));
+            }
             ProcessingTimeMs = sw.Elapsed.TotalMilliseconds;
             ThroughputMpxs = (gray.Width * gray.Height / 1_000_000.0) / (sw.Elapsed.TotalSeconds > 0 ? sw.Elapsed.TotalSeconds : 1e-9);
 
