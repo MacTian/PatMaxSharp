@@ -11,35 +11,29 @@ namespace PatMaxSharp.UI.Controls;
 
 /// <summary>
 /// Image viewer with zoom/pan and rectangular region selection.
-/// Region selection is used for the training region and the search region.
+/// Renders the image plus train/search region overlays and match markers.
 /// </summary>
-public sealed class ImageRegionSelector : Control
+public partial class ImageRegionSelector : UserControl
 {
     private Canvas _canvas = null!;
     private Image _image = null!;
     private ScaleTransform _scale = null!;
-    private TranslateTransform _translate = null!;
     private Rectangle _trainRect = null!;
     private Rectangle _searchRect = null!;
     private Rectangle _dragRect = null!;
     private Point _dragStart;
     private bool _isDragging;
 
-    static ImageRegionSelector()
-    {
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(ImageRegionSelector),
-            new FrameworkPropertyMetadata(typeof(ImageRegionSelector)));
-    }
-
     public ImageRegionSelector()
     {
+        InitializeComponent();
         Loaded += (_, _) => Setup();
     }
 
     #region Dependency properties
     public static readonly DependencyProperty SourceProperty =
         DependencyProperty.Register(nameof(Source), typeof(ImageSource), typeof(ImageRegionSelector),
-            new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).Setup()));
+            new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).OnSourceChanged()));
 
     public ImageSource Source
     {
@@ -67,7 +61,26 @@ public sealed class ImageRegionSelector : Control
         set => SetValue(SearchRegionProperty, value);
     }
 
-    /// <summary>Which region the user is drawing: Train / Search.</summary>
+    public static readonly DependencyProperty MarkersProperty =
+        DependencyProperty.Register(nameof(Markers), typeof(List<MatchMarker>), typeof(ImageRegionSelector),
+            new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
+
+    public List<MatchMarker> Markers
+    {
+        get => (List<MatchMarker>)GetValue(MarkersProperty);
+        set => SetValue(MarkersProperty, value);
+    }
+
+    public static readonly DependencyProperty SelectedIndexProperty =
+        DependencyProperty.Register(nameof(SelectedIndex), typeof(int), typeof(ImageRegionSelector),
+            new PropertyMetadata(-1, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
+
+    public int SelectedIndex
+    {
+        get => (int)GetValue(SelectedIndexProperty);
+        set => SetValue(SelectedIndexProperty, value);
+    }
+
     public static readonly DependencyProperty SelectModeProperty =
         DependencyProperty.Register(nameof(SelectMode), typeof(RegionKind), typeof(ImageRegionSelector),
             new PropertyMetadata(RegionKind.Train));
@@ -92,41 +105,20 @@ public sealed class ImageRegionSelector : Control
         DependencyProperty.Register(nameof(Zoom), typeof(double), typeof(ImageRegionSelector),
             new PropertyMetadata(1.0));
     public double Zoom { get => (double)GetValue(ZoomProperty); set => SetValue(ZoomProperty, value); }
-
-    /// <summary>Result markers drawn on the image (position + angle).</summary>
-    public static readonly DependencyProperty MarkersProperty =
-        DependencyProperty.Register(nameof(Markers), typeof(List<MatchMarker>), typeof(ImageRegionSelector),
-            new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
-
-    public List<MatchMarker> Markers
-    {
-        get => (List<MatchMarker>)GetValue(MarkersProperty);
-        set => SetValue(MarkersProperty, value);
-    }
-
-    /// <summary>Index of the highlighted (selected) marker. -1 = none.</summary>
-    public int SelectedIndex
-    {
-        get => (int)GetValue(SelectedIndexProperty);
-        set => SetValue(SelectedIndexProperty, value);
-    }
-
-    public static readonly DependencyProperty SelectedIndexProperty =
-        DependencyProperty.Register(nameof(SelectedIndex), typeof(int), typeof(ImageRegionSelector),
-            new PropertyMetadata(-1, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
     #endregion
 
     public event Action<Rect?>? RegionChanged;
 
+    private void OnSourceChanged() => Setup();
+
     public void Setup()
     {
         if (_canvas != null) return;
-        _canvas = new Canvas { Background = Brushes.Black };
+        _canvas = canvas;
+
         _scale = new ScaleTransform(1, 1);
-        _translate = new TranslateTransform(0, 0);
         var group = new TransformGroup();
         group.Children.Add(_scale);
-        group.Children.Add(_translate);
 
         _image = new Image
         {
@@ -137,18 +129,8 @@ public sealed class ImageRegionSelector : Control
         };
         _canvas.Children.Add(_image);
 
-        _trainRect = new Rectangle
-        {
-            Stroke = Brushes.Lime, StrokeThickness = 2,
-            Fill = new SolidColorBrush(Color.FromArgb(40, 0, 255, 0)),
-            Visibility = Visibility.Collapsed
-        };
-        _searchRect = new Rectangle
-        {
-            Stroke = Brushes.Cyan, StrokeThickness = 2,
-            Fill = new SolidColorBrush(Color.FromArgb(40, 0, 255, 255)),
-            Visibility = Visibility.Collapsed
-        };
+        _trainRect = MakeRect(Brushes.Lime, Color.FromArgb(40, 0, 255, 0));
+        _searchRect = MakeRect(Brushes.Cyan, Color.FromArgb(40, 0, 255, 255));
         _dragRect = new Rectangle
         {
             Stroke = Brushes.Yellow, StrokeThickness = 2,
@@ -159,27 +141,38 @@ public sealed class ImageRegionSelector : Control
         _canvas.Children.Add(_searchRect);
         _canvas.Children.Add(_dragRect);
 
-        _canvas.MouseWheel += OnMouseWheel;
-        _canvas.MouseLeftButtonDown += OnMouseDown;
-        _canvas.MouseMove += OnMouseMove;
-        _canvas.MouseLeftButtonUp += OnMouseUp;
-
         if (Source != null)
         {
             _image.Source = Source;
-            var w = (Source as System.Windows.Media.Imaging.BitmapSource)?.PixelWidth ?? 0;
-            var h = (Source as System.Windows.Media.Imaging.BitmapSource)?.PixelHeight ?? 0;
-            ImageWidth = w; ImageHeight = h;
+            var bs = Source as System.Windows.Media.Imaging.BitmapSource;
+            if (bs != null)
+            {
+                ImageWidth = bs.PixelWidth;
+                ImageHeight = bs.PixelHeight;
+                _image.Width = bs.PixelWidth;
+                _image.Height = bs.PixelHeight;
+            }
         }
-        RedrawRegions();
+        ApplyZoom();
     }
 
+    private static Rectangle MakeRect(Brush stroke, Color fill)
+    {
+        return new Rectangle
+        {
+            Stroke = stroke, StrokeThickness = 2,
+            Fill = new SolidColorBrush(fill),
+            Visibility = Visibility.Collapsed
+        };
+    }
+
+    // ---- Mouse handlers (wired in XAML) ----
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (Source == null) return;
         double factor = e.Delta > 0 ? 1.1 : 0.9;
         Zoom = Math.Clamp(Zoom * factor, 0.1, 20);
-        ApplyTransform();
+        ApplyZoom();
     }
 
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
@@ -198,10 +191,10 @@ public sealed class ImageRegionSelector : Control
     {
         if (!_isDragging) return;
         var p = e.GetPosition(_canvas);
-        double x = Math.Min(_dragStart.X, p.X), y = Math.Min(_dragStart.Y, p.Y);
         _dragRect.Width = Math.Abs(p.X - _dragStart.X);
         _dragRect.Height = Math.Abs(p.Y - _dragStart.Y);
-        Canvas.SetLeft(_dragRect, x); Canvas.SetTop(_dragRect, y);
+        Canvas.SetLeft(_dragRect, Math.Min(_dragStart.X, p.X));
+        Canvas.SetTop(_dragRect, Math.Min(_dragStart.Y, p.Y));
     }
 
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
@@ -226,9 +219,10 @@ public sealed class ImageRegionSelector : Control
         RedrawRegions();
     }
 
-    private void ApplyTransform()
+    private void ApplyZoom()
     {
-        _scale.ScaleX = Zoom; _scale.ScaleY = Zoom;
+        _scale.ScaleX = Zoom;
+        _scale.ScaleY = Zoom;
         if (_image.Source is System.Windows.Media.Imaging.BitmapSource bs)
         {
             _image.Width = bs.PixelWidth;
@@ -240,6 +234,7 @@ public sealed class ImageRegionSelector : Control
     private void RedrawRegions()
     {
         if (_trainRect == null) return;
+
         if (TrainRegion is Rect tr)
         {
             _trainRect.Visibility = Visibility.Visible;
@@ -256,74 +251,47 @@ public sealed class ImageRegionSelector : Control
         }
         else _searchRect.Visibility = Visibility.Collapsed;
 
-        // Draw match markers (position + angle arrow + score)
-        if (Markers != null)
+        // match markers
+        var old = _canvas.Children
+            .OfType<FrameworkElement>()
+            .Where(fe => fe.Tag is MatchMarkerTag)
+            .ToList();
+        foreach (var el in old) _canvas.Children.Remove(el);
+
+        if (Markers == null) return;
+        for (int mi = 0; mi < Markers.Count; mi++)
         {
-            // remove previous markers first
-            var toRemove = _canvas.Children
-                .OfType<FrameworkElement>()
-                .Where(fe => fe.Tag is MatchMarkerTag)
-                .ToList();
-            foreach (var el in toRemove) _canvas.Children.Remove(el);
+            var m = Markers[mi];
+            bool selected = (mi == SelectedIndex);
+            var brush = selected ? Brushes.Yellow : (m.Accepted ? Brushes.Lime : Brushes.Orange);
+            double thickness = selected ? 4.0 : 2.0;
+            var pos = new Point(m.X * Zoom, m.Y * Zoom);
+            double s = m.Size * Zoom * m.Scale;
+            double a = m.AngleDeg * Math.PI / 180.0;
 
-            for (int mi = 0; mi < Markers.Count; mi++)
+            var crossH = new Line { X1 = pos.X - 8 * Zoom, Y1 = pos.Y, X2 = pos.X + 8 * Zoom, Y2 = pos.Y, Stroke = brush, StrokeThickness = thickness };
+            var crossV = new Line { X1 = pos.X, Y1 = pos.Y - 8 * Zoom, X2 = pos.X, Y2 = pos.Y + 8 * Zoom, Stroke = brush, StrokeThickness = thickness };
+            var arrow = new Line { X1 = pos.X, Y1 = pos.Y, X2 = pos.X + Math.Cos(a) * s, Y2 = pos.Y + Math.Sin(a) * s, Stroke = brush, StrokeThickness = thickness };
+            var box = new Rectangle
             {
-                var m = Markers[mi];
-                bool selected = (mi == SelectedIndex);
-                var pos = m.DisplayPos(Zoom);
-                double s = m.Size * Zoom * m.Scale;
-                double a = m.AngleDeg * Math.PI / 180.0;
-                var brush = selected ? Brushes.Yellow : (m.Accepted ? Brushes.Lime : Brushes.Orange);
-                double thickness = selected ? 4.0 : 2.0;
+                Width = s * 2, Height = s * 2,
+                Stroke = brush, StrokeThickness = thickness,
+                StrokeDashArray = new DoubleCollection { 3, 2 },
+                Fill = Brushes.Transparent
+            };
+            Canvas.SetLeft(box, pos.X - s);
+            Canvas.SetTop(box, pos.Y - s);
 
-                // cross at the match position
-                var crossH = new Line
-                {
-                    X1 = pos.X - 8 * Zoom, Y1 = pos.Y, X2 = pos.X + 8 * Zoom, Y2 = pos.Y,
-                    Stroke = brush, StrokeThickness = thickness
-                };
-                var crossV = new Line
-                {
-                    X1 = pos.X, Y1 = pos.Y - 8 * Zoom, X2 = pos.X, Y2 = pos.Y + 8 * Zoom,
-                    Stroke = brush, StrokeThickness = thickness
-                };
-                // angle arrow
-                var arrow = new Line
-                {
-                    X1 = pos.X, Y1 = pos.Y,
-                    X2 = pos.X + Math.Cos(a) * s, Y2 = pos.Y + Math.Sin(a) * s,
-                    Stroke = brush, StrokeThickness = thickness
-                };
-                // bounding box
-                var box = new Rectangle
-                {
-                    Width = s * 2, Height = s * 2,
-                    Stroke = brush, StrokeThickness = thickness,
-                    StrokeDashArray = new DoubleCollection { 3, 2 },
-                    Fill = Brushes.Transparent
-                };
-                Canvas.SetLeft(box, pos.X - s);
-                Canvas.SetTop(box, pos.Y - s);
-
-                _canvas.Children.Add(box);
-                _canvas.Children.Add(crossH);
-                _canvas.Children.Add(crossV);
-                _canvas.Children.Add(arrow);
-                box.Tag = new MatchMarkerTag { Marker = m };
-                crossH.Tag = new MatchMarkerTag { Marker = m };
-                crossV.Tag = new MatchMarkerTag { Marker = m };
-                arrow.Tag = new MatchMarkerTag { Marker = m };
-            }
+            foreach (var el in new FrameworkElement[] { box, crossH, crossV, arrow })
+                el.Tag = new MatchMarkerTag();
+            _canvas.Children.Add(box);
+            _canvas.Children.Add(crossH);
+            _canvas.Children.Add(crossV);
+            _canvas.Children.Add(arrow);
         }
     }
 
-    private sealed class MatchMarkerTag { public MatchMarker Marker { get; set; } }
-
-    public override void OnApplyTemplate()
-    {
-        base.OnApplyTemplate();
-        Setup();
-    }
+    private sealed class MatchMarkerTag { }
 }
 
 /// <summary>A match result marker drawn on the image.</summary>
@@ -336,9 +304,6 @@ public sealed class MatchMarker
     public double Score { get; set; }
     public bool Accepted { get; set; }
     public double Size { get; set; } = 24;
-
-    /// <summary>Image pixel coordinates (already scaled to display).</summary>
-    public Point DisplayPos(double zoom) => new Point(X * zoom, Y * zoom);
 }
 
 public enum RegionKind { Train, Search }
