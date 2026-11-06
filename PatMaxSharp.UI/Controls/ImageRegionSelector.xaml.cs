@@ -109,7 +109,25 @@ public partial class ImageRegionSelector : UserControl
 
     public event Action<Rect?>? RegionChanged;
 
-    private void OnSourceChanged() => Setup();
+    private void OnSourceChanged()
+    {
+        // If already initialized, just update the image source/size
+        if (_canvas != null)
+        {
+            _image.Source = Source;
+            if (Source is System.Windows.Media.Imaging.BitmapSource bs)
+            {
+                ImageWidth = bs.PixelWidth;
+                ImageHeight = bs.PixelHeight;
+                _image.Width = bs.PixelWidth;
+                _image.Height = bs.PixelHeight;
+                Zoom = Math.Min(1.0, 1.0);
+                ApplyZoom();
+            }
+            return;
+        }
+        Setup();
+    }
 
     public void Setup()
     {
