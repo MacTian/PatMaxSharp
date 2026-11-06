@@ -338,3 +338,10 @@ MIT License — for learning and research purposes only.
 > specifications are derived from analysis of public metadata in the Cognex binary
 > (type library, RTTI, strings, parameter formulas). It must not be used for any purpose
 > that infringes Cognex's intellectual property rights.
+
+### Matching behaviour
+
+- **Returns a single best result** (coarse-to-fine NCC localisation + feature coverage verification)
+- Coarse pass (step x2) -> fine pass (step x1) -> coverage verification
+- Typical time: tens of milliseconds for a 256x256 image
+- Accuracy depends on the target being distinct; use images with a **clear feature and clean background**
