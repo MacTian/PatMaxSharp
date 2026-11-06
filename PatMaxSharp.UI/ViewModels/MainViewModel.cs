@@ -177,29 +177,134 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public int ImagePixelHeight { get; private set; }
 
     // ---- Parameters (bound to the UI) ----
-    public int PrecisionStep { get; set; } = 1;
-    public bool SubpixelRefinement { get; set; } = true;
-    public bool EnableClustering { get; set; } = true;
-    public double ClusterRadius { get; set; } = 8.0;
-    public double PreSmoothSigma { get; set; } = 0.5;
-    public bool UseSimd { get; set; } = true;
-    public bool UseParallel { get; set; } = true;
+    private int _PrecisionStep = 1;
+    public int PrecisionStep
+    {
+        get => _PrecisionStep;
+        set => Set(ref _PrecisionStep, value);
+    }
+    private bool _SubpixelRefinement = true;
+    public bool SubpixelRefinement
+    {
+        get => _SubpixelRefinement;
+        set => Set(ref _SubpixelRefinement, value);
+    }
+    private bool _EnableClustering = true;
+    public bool EnableClustering
+    {
+        get => _EnableClustering;
+        set => Set(ref _EnableClustering, value);
+    }
+    private double _ClusterRadius = 8.0;
+    public double ClusterRadius
+    {
+        get => _ClusterRadius;
+        set => Set(ref _ClusterRadius, value);
+    }
+    private double _PreSmoothSigma = 0.5;
+    public double PreSmoothSigma
+    {
+        get => _PreSmoothSigma;
+        set => Set(ref _PreSmoothSigma, value);
+    }
+    private bool _UseSimd = true;
+    public bool UseSimd
+    {
+        get => _UseSimd;
+        set => Set(ref _UseSimd, value);
+    }
+    private bool _UseParallel = true;
+    public bool UseParallel
+    {
+        get => _UseParallel;
+        set => Set(ref _UseParallel, value);
+    }
 
     // ---- Search parameters ----
-    public double RotationAngleMin { get; set; } = -180;
-    public double RotationAngleMax { get; set; } = 180;
-    public double ScaleMin { get; set; } = 0.8;
-    public double ScaleMax { get; set; } = 1.2;
-    public double AcceptThreshold { get; set; } = 0.5;
-    public double ContrastThreshold { get; set; } = 0.1;
-    public double Grain { get; set; } = 1.0;
-    public int MaxResults { get; set; } = 10;
-    public int CoarseGrainLimit { get; set; } = 10;
-    public int FineGrainLimit { get; set; } = 5;
-    public double XYOverlap { get; set; } = 0.5;
-    public double TimeoutMs { get; set; } = 5000;
-    public int ApproximateNumberToFind { get; set; } = 1;
-    public bool ScoreUsingClutter { get; set; } = true;
+    private double _RotationAngleMin = -180;
+    public double RotationAngleMin
+    {
+        get => _RotationAngleMin;
+        set => Set(ref _RotationAngleMin, value);
+    }
+    private double _RotationAngleMax = 180;
+    public double RotationAngleMax
+    {
+        get => _RotationAngleMax;
+        set => Set(ref _RotationAngleMax, value);
+    }
+    private double _ScaleMin = 0.8;
+    public double ScaleMin
+    {
+        get => _ScaleMin;
+        set => Set(ref _ScaleMin, value);
+    }
+    private double _ScaleMax = 1.2;
+    public double ScaleMax
+    {
+        get => _ScaleMax;
+        set => Set(ref _ScaleMax, value);
+    }
+    private double _AcceptThreshold = 0.5;
+    public double AcceptThreshold
+    {
+        get => _AcceptThreshold;
+        set => Set(ref _AcceptThreshold, value);
+    }
+    private double _ContrastThreshold = 0.1;
+    public double ContrastThreshold
+    {
+        get => _ContrastThreshold;
+        set => Set(ref _ContrastThreshold, value);
+    }
+    private double _Grain = 1.0;
+    public double Grain
+    {
+        get => _Grain;
+        set => Set(ref _Grain, value);
+    }
+    private int _MaxResults = 10;
+    public int MaxResults
+    {
+        get => _MaxResults;
+        set => Set(ref _MaxResults, value);
+    }
+    private int _CoarseGrainLimit = 10;
+    public int CoarseGrainLimit
+    {
+        get => _CoarseGrainLimit;
+        set => Set(ref _CoarseGrainLimit, value);
+    }
+    private int _FineGrainLimit = 5;
+    public int FineGrainLimit
+    {
+        get => _FineGrainLimit;
+        set => Set(ref _FineGrainLimit, value);
+    }
+    private double _XYOverlap = 0.5;
+    public double XYOverlap
+    {
+        get => _XYOverlap;
+        set => Set(ref _XYOverlap, value);
+    }
+    private double _TimeoutMs = 5000;
+    public double TimeoutMs
+    {
+        get => _TimeoutMs;
+        set => Set(ref _TimeoutMs, value);
+    }
+    private int _ApproximateNumberToFind = 1;
+    public int ApproximateNumberToFind
+    {
+        get => _ApproximateNumberToFind;
+        set => Set(ref _ApproximateNumberToFind, value);
+    }
+    private bool _ScoreUsingClutter = true;
+    public bool ScoreUsingClutter
+    {
+        get => _ScoreUsingClutter;
+        set => Set(ref _ScoreUsingClutter, value);
+    }
 
     public ObservableCollection<MatchResult> Results { get; } = new();
 

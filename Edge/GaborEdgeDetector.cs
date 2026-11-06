@@ -189,7 +189,7 @@ public sealed class GaborEdgeDetector
         {
             Parallel.For(0, OrientationCount, o =>
             {
-                ConvolveOrientation(src, w, h, _kernels[o], response, 0, h);
+                ConvolveOrientation(src, w, h, _kernels[o], response, HalfSize, h - HalfSize);
                 Buffer.BlockCopy(response, 0, responses, o * n * sizeof(float), n * sizeof(float));
             });
         }
@@ -197,7 +197,7 @@ public sealed class GaborEdgeDetector
         {
             for (int o = 0; o < OrientationCount; o++)
             {
-                ConvolveOrientation(src, w, h, _kernels[o], response, 0, h);
+                ConvolveOrientation(src, w, h, _kernels[o], response, HalfSize, h - HalfSize);
                 Buffer.BlockCopy(response, 0, responses, o * n * sizeof(float), n * sizeof(float));
             }
         }

@@ -33,6 +33,15 @@ public sealed class PatternModel
     /// <summary>Effective grain (coarse/fine) used to build the DoG kernel.</summary>
     public double Grain { get; set; } = 1.0;
 
+    /// <summary>
+    /// Edge-magnitude template captured at train time. Used by the robust
+    /// normalized-cross-correlation matcher (PatMax-style edge template).
+    /// </summary>
+    public float[] Template { get; set; } = Array.Empty<float>();
+    public int TemplateWidth { get; set; }
+    public int TemplateHeight { get; set; }
+    public bool HasTemplate => Template.Length > 0;
+
     public void AddFeaturelet(Featurelet f)
     {
         Featurelets.Add(f);

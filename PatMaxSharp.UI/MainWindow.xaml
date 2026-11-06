@@ -26,12 +26,25 @@
             <Setter Property="Foreground" Value="#CCC"/>
             <Setter Property="Margin" Value="2"/>
         </Style>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#4A4A4A"/>
+            <Setter Property="Foreground" Value="#F0F0F0"/>
+            <Setter Property="BorderBrush" Value="#6A6A6A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="MinWidth" Value="90"/>
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+        </Style>
     </Window.Resources>
 
     <DockPanel Background="#1E1E1E">
         <!-- Toolbar -->
-        <ToolBarTray DockPanel.Dock="Top" Background="#2D2D30">
-            <ToolBar Background="#2D2D30" Foreground="#EEE">
+        <ToolBarTray DockPanel.Dock="Top" Background="#3C3C3C">
+            <ToolBar Background="#3C3C3C" Foreground="#F0F0F0"
+                     ToolBarTray.IsLocked="True">
                 <Button Content="打开图片" Command="{Binding OpenImageCommand}"/>
                 <Separator/>
                 <Button Content="训练模型" Command="{Binding TrainCommand}"/>

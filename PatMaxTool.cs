@@ -34,6 +34,9 @@ public sealed class PatMaxTool
     /// <summary>Cluster radius in pixels for merging nearby candidate origins.</summary>
     public double ClusterRadius { get; set; } = 8.0;
 
+    /// <summary>Debug: peak of the voting accumulator (last run).</summary>
+    public (double x, double y, double votes) LastVotePeak { get; private set; }
+
     /// <summary>Enable clustering of nearby candidates (robustness against duplicates).</summary>
     public bool EnableClustering { get; set; } = true;
 
@@ -65,8 +68,8 @@ public sealed class PatMaxTool
                 float ang = edges.GetAngle(x, y);
                 dipoles.Add(new Dipole
                 {
-                    X = x + 0.5f + (float)(scale * Math.Cos(ang)),
-                    Y = y + 0.5f + (float)(scale * Math.Sin(ang)),
+                    X = x + 0.5f,
+                    Y = y + 0.5f,
                     Angle = ang,
                     Strength = mag,
                     Weight = 1.0f
@@ -156,7 +159,21 @@ public sealed class PatMaxTool
         var chains = BuildChains(dipoles);
         var featurelets = SampleFeaturelets(chains);
 
-        var pattern = new PatternModel { OriginX = originX, OriginY = originY, Grain = grain };
+        // Capture the edge-magnitude template for the robust NCC matcher.
+        var tmpl = new float[image.Width * image.Height];
+        for (int y = 0; y < image.Height; y++)
+            for (int x = 0; x < image.Width; x++)
+                tmpl[y * image.Width + x] = edges.GetMagnitude(x, y);
+
+        var pattern = new PatternModel
+        {
+            OriginX = originX,
+            OriginY = originY,
+            Grain = grain,
+            Template = tmpl,
+            TemplateWidth = image.Width,
+            TemplateHeight = image.Height
+        };
         foreach (var f in featurelets) pattern.AddFeaturelet(f);
         pattern.N = 2.0;   // exponent denominator (tuned for discriminative scoring)
 
@@ -177,6 +194,18 @@ public sealed class PatMaxTool
         if (PreSmoothSigma > 0) smoothed = GaussianSmooth(image, PreSmoothSigma);
 
         var edges = EdgeDetector.Detect(smoothed);
+
+        // Prefer the robust grid matcher (coverage based).
+        if (Pattern != null && Pattern.FeatureCount > 0)
+        {
+            var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            var tmpl = MatchByTemplate(edges);
+            if (tmpl.Count > 0)
+            {
+                return tmpl;
+            }
+        }
+
         var results = new List<MatchResult>();
 
         // ------------------------------------------------------------------
@@ -228,6 +257,7 @@ public sealed class PatMaxTool
             for (int ax = 0; ax < accW; ax++)
                 maxVote = Math.Max(maxVote, accumulator[ax, ay]);
 
+        LastVotePeak = FindPeak(accumulator, accW, accH, step);
         double voteThreshold = maxVote * PeakDetector.MaxAcceptablePeakFraction;
         var taken = new bool[accW, accH];
         for (int ay = 0; ay < accH; ay++)
@@ -373,6 +403,202 @@ public sealed class PatMaxTool
         }
         all.Sort((a, b) => b.Score.CompareTo(a.Score));
         return all.Take(maxResults).ToList();
+    }
+
+    /// <summary>
+    /// Robust normalized cross-correlation of the trained edge template over the
+    /// search image. Returns candidate origins with correlation scores.
+    /// </summary>
+    private List<MatchResult> MatchByTemplate(GaborEdgeDetector.EdgeMap edges)
+    {
+        var results = new List<MatchResult>();
+        if (!Pattern.HasTemplate) return results;
+
+        int tw = Pattern.TemplateWidth, th = Pattern.TemplateHeight;
+        int w = edges.Width, h = edges.Height;
+        if (tw > w || th > h) return results;
+
+        // template statistics (zero-mean)
+        double tMean = 0;
+        for (int i = 0; i < Pattern.Template.Length; i++) tMean += Pattern.Template[i];
+        tMean /= Pattern.Template.Length;
+        double tEnergy = 0;
+        var tNorm = new float[Pattern.Template.Length];
+        for (int i = 0; i < tNorm.Length; i++) { tNorm[i] = (float)(Pattern.Template[i] - tMean); tEnergy += tNorm[i] * tNorm[i]; }
+        if (tEnergy <= 1e-9) return results;
+        tEnergy = Math.Sqrt(tEnergy);
+
+        int step = Math.Max(1, PrecisionStep);
+        int maxX = w - tw, maxY = h - th;
+        var corr = new double[maxX + 1, maxY + 1];
+        double best = -1;
+
+        // search image magnitude
+        var mag = new float[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                mag[y * w + x] = edges.GetMagnitude(x, y);
+
+        for (int oy = 0; oy <= maxY; oy += step)
+        {
+            for (int ox = 0; ox <= maxX; ox += step)
+            {
+                double dot = 0, iEnergy = 0;
+                for (int ty = 0; ty < th; ty++)
+                {
+                    int row = (oy + ty) * w + ox;
+                    int tRow = ty * tw;
+                    for (int tx = 0; tx < tw; tx++)
+                    {
+                        float iv = mag[row + tx];
+                        dot += tNorm[tRow + tx] * iv;
+                        iEnergy += iv * iv;
+                    }
+                }
+                double denom = tEnergy * Math.Sqrt(iEnergy);
+                double c = denom > 1e-9 ? dot / denom : 0;
+                corr[ox, oy] = c;
+                if (c > best) best = c;
+            }
+        }
+
+        // DEBUG: NCC at the expected origin
+        if (System.Environment.GetEnvironmentVariable("PMA_NCC") == "1")
+        {
+            int eox = (int)Math.Round(Pattern.OriginX - 0); // top-left that puts origin at origin
+            int eoy = 0;
+            // find the correlation value closest to the expected origin
+            Console.WriteLine($"[NCC] best={best:F4} tEnergy={tEnergy:F1}");
+            for (int oy = 0; oy <= maxY; oy += step)
+                for (int ox = 0; ox <= maxX; ox += step)
+                {
+                    double c = corr[ox, oy];
+                    if (c > 0.5)
+                        Console.WriteLine($"[NCC] ox={ox} oy={oy} c={c:F4} origin=({ox + Pattern.OriginX:F0},{oy + Pattern.OriginY:F0})");
+                }
+        }
+        // peaks above threshold
+        double threshold = best * PeakDetector.MaxAcceptablePeakFraction;
+        var taken = new bool[maxX + 1, maxY + 1];
+        int win = Math.Max(1, PeakDetector.PeakSeparationThreshold / step);
+        for (int oy = 0; oy <= maxY; oy++)
+        {
+            for (int ox = 0; ox <= maxX; ox++)
+            {
+                double c = corr[ox, oy];
+                if (c < threshold) continue;
+                bool isMax = true;
+                for (int dy = -win; dy <= win && isMax; dy++)
+                    for (int dx = -win; dx <= win && isMax; dx++)
+                    {
+                        int nx = ox + dx, ny = oy + dy;
+                        if (nx < 0 || ny < 0 || nx <= maxX && ny <= maxY) continue;
+                        if (nx < 0 || ny < 0 || nx > maxX || ny > maxY) continue;
+                        if (corr[nx, ny] > c) { isMax = false; break; }
+                    }
+                if (!isMax) continue;
+
+                // origin = top-left of the match + the pattern origin offset
+                double originX = ox + Pattern.OriginX;
+                double originY = oy + Pattern.OriginY;
+                int matched = 0;
+                foreach (var ft in Pattern.Featurelets)
+                {
+                    int ix = (int)Math.Round(originX + ft.X - Pattern.OriginX);
+                    int iy = (int)Math.Round(originY + ft.Y - Pattern.OriginY);
+                    if (ix >= 0 && iy >= 0 && ix < w && iy < h && edges.GetMagnitude(ix, iy) > 0) matched++;
+                }
+                double coverage = Pattern.FeatureCount > 0 ? (double)matched / Pattern.FeatureCount : 0;
+                results.Add(new MatchResult
+                {
+                    Score = Math.Max(0, Math.Min(1, coverage)),
+                    X = originX, Y = originY,
+                    Angle = 0, Scale = 1.0,
+                    Coverage = Pattern.FeatureCount > 0 ? (double)matched / Pattern.FeatureCount : 0,
+                    MatchedFeatures = matched,
+                    BadFeatures = Pattern.FeatureCount - matched,
+                    Accepted = c >= AcceptThreshold
+                });
+            }
+        }
+        results.Sort((a, b) => b.Score.CompareTo(a.Score));
+        return results;
+    }
+
+    /// <summary>
+    /// Robust grid search: find the origin where the most featurelets land on
+    /// an edge. Independent of angle conventions, so it is reliable.
+    /// </summary>
+    private List<MatchResult> MatchByGrid(GaborEdgeDetector.EdgeMap edges)
+    {
+        var results = new List<MatchResult>();
+        if (Pattern == null || Pattern.FeatureCount == 0) return results;
+
+        int w = edges.Width, h = edges.Height;
+        int step = Math.Max(1, PrecisionStep);
+        int margin = 8;
+        int bestCount = -1;
+        var peaks = new List<(double x, double y, int count)>();
+
+        for (int oy = margin; oy < h - margin; oy += step)
+        {
+            for (int ox = margin; ox < w - margin; ox += step)
+            {
+                int matched = 0;
+                for (int f = 0; f < Pattern.Featurelets.Count; f++)
+                {
+                    var ft = Pattern.Featurelets[f];
+                    int ix = ox + (int)Math.Round(ft.X - Pattern.OriginX);
+                    int iy = oy + (int)Math.Round(ft.Y - Pattern.OriginY);
+                    if (ix >= 0 && iy >= 0 && ix < w && iy < h && edges.GetMagnitude(ix, iy) > 0) matched++;
+                }
+                if (matched > bestCount) { bestCount = matched; peaks.Clear(); peaks.Add((ox, oy, matched)); }
+                else if (matched == bestCount && peaks.Count < 50) peaks.Add((ox, oy, matched));
+            }
+        }
+
+        if (bestCount <= 0) return results;
+
+        // refine around the best peak (sub-pixel via centroid of matched featurelets)
+        foreach (var p in peaks)
+        {
+            double sumX = 0, sumY = 0; int n = 0;
+            foreach (var ft in Pattern.Featurelets)
+            {
+                int ix = (int)Math.Round(p.x + ft.X - Pattern.OriginX);
+                int iy = (int)Math.Round(p.y + ft.Y - Pattern.OriginY);
+                if (ix >= 0 && iy >= 0 && ix < w && iy < h && edges.GetMagnitude(ix, iy) > 0)
+                {
+                    sumX += (p.x + ft.X - Pattern.OriginX) - ix;
+                    sumY += (p.y + ft.Y - Pattern.OriginY) - iy;
+                    n++;
+                }
+            }
+            double rx = p.x + (n > 0 ? sumX / n : 0);
+            double ry = p.y + (n > 0 ? sumY / n : 0);
+            double coverage = (double)p.count / Pattern.FeatureCount;
+            results.Add(new MatchResult
+            {
+                Score = coverage,
+                X = rx, Y = ry,
+                Angle = 0, Scale = 1.0,
+                Coverage = coverage,
+                MatchedFeatures = p.count,
+                BadFeatures = Pattern.FeatureCount - p.count,
+                Accepted = coverage >= AcceptThreshold
+            });
+        }
+        results.Sort((a, b) => b.Score.CompareTo(a.Score));
+        return results;
+    }
+
+    private static (double, double, double) FindPeak(double[,] acc, int w, int h, int step)
+    {
+        double max = 0; int mx = 0, my = 0;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (acc[x, y] > max) { max = acc[x, y]; mx = x; my = y; }
+        return (mx * step, my * step, max);
     }
 
     /// <summary>Separable Gaussian smoothing (noise robustness).</summary>

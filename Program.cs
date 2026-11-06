@@ -5,6 +5,7 @@ using PatMaxSharp.Projection;
 
 Console.OutputEncoding = Encoding.UTF8;
 
+static double NormalizeAngle(double a){ while(a>Math.PI)a-=2*Math.PI; while(a<-Math.PI)a+=2*Math.PI; return a; }
 Console.WriteLine("=========================================================");
 Console.WriteLine("  PatMaxSharp — Cognex PatMax 算法的 C# 复现");
 Console.WriteLine("  基于对 Cognex.VisionPro.PMAlign.dll 的逆向分析");
@@ -80,6 +81,25 @@ var conv = dog1.Convolve(signal);
 Console.WriteLine($"  输入: [{string.Join(", ", signal)}]");
 Console.WriteLine($"  输出: [{string.Join(", ", conv.Select(v => v.ToString("F3")))}]");
 Console.WriteLine($"  奇对称优化: [{string.Join(", ", dog1.ConvolveOdd(signal).Select(v => v.ToString("F3")))}]");
+// ---- 0. 训练区域 -> 全图匹配验证 ----
+Console.WriteLine();
+Console.WriteLine("训练区域 -> 全图匹配验证:");
+var verifyImg = GrayImage.CreateTest(256, 256, seed: 42);
+// 在 (78,78) 处框选 100x100 的训练区域
+// 模拟 UI: 裁剪 (78,78)-(178,178) 区域, 局部原点 (50,50)
+var vcrop = new GrayImage(100, 100);
+for (int cj = 0; cj < 100; cj++)
+    for (int ci = 0; ci < 100; ci++)
+        vcrop[ci, cj] = verifyImg[78 + ci, 78 + cj];
+var vt = new PatMaxTool();
+var vpat = vt.Train(vcrop, 50.0, 50.0, grain: 1.0);
+Console.WriteLine($"  训练区域: (78,78)-(178,178), 原点 (128,128)");
+var vres = vt.Run(verifyImg, 5);
+Console.WriteLine($"  期望原点: (128,128)");
+foreach (var r in vres.Take(3))
+    Console.WriteLine($"    {r}");
+Console.WriteLine();
+
 // ---- 8b. 性能基准测试 -------------------------------------------
 Console.WriteLine();
 Console.WriteLine("性能基准 (256x256, 12 朝向 Gabor):");

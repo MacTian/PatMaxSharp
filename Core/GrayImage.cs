@@ -54,10 +54,10 @@ public sealed class GrayImage
     {
         var img = new GrayImage(width, height);
         var rnd = new Random(seed);
-        // background gradient + noise
+        // Smooth low-frequency background (few edges) so the object stands out.
         for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
-                img[x, y] = (byte)((x * 2 + y + rnd.Next(12)) & 0xFF);
+                img[x, y] = (byte)(128 + 40 * Math.Sin(x / 32.0) * Math.Cos(y / 32.0));
         // a bright rectangle "object"
         int bw = width / 3, bh = height / 3;
         int bx = width / 3, by = height / 3;
