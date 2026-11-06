@@ -33,6 +33,8 @@ public sealed class PatMaxTool
 
     /// <summary>Cluster radius in pixels for merging nearby candidate origins.</summary>
     public double ClusterRadius { get; set; } = 8.0;
+    public double RotationAngleMin { get; set; } = -180;
+    public double RotationAngleMax { get; set; } = 180;
 
     /// <summary>Debug: peak of the voting accumulator (last run).</summary>
     public (double x, double y, double votes) LastVotePeak { get; private set; }
@@ -418,7 +420,11 @@ public sealed class PatMaxTool
         int w = edges.Width, h = edges.Height;
         if (tw > w || th > h) return results;
 
-        // template statistics (zero-mean)
+        var mag = new float[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                mag[y * w + x] = edges.GetMagnitude(x, y);
+
         double tMean = 0;
         for (int i = 0; i < Pattern.Template.Length; i++) tMean += Pattern.Template[i];
         tMean /= Pattern.Template.Length;
@@ -428,70 +434,120 @@ public sealed class PatMaxTool
         if (tEnergy <= 1e-9) return results;
         tEnergy = Math.Sqrt(tEnergy);
 
-        // search image magnitude
-        var mag = new float[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                mag[y * w + x] = edges.GetMagnitude(x, y);
-
         int maxX = w - tw, maxY = h - th;
-
-        // ---- coarse pass (step = 4) ----
         int coarse = Math.Max(2, PrecisionStep * 2);
-        double bestCoarse = -1;
-        int bestX = 0, bestY = 0;
-        for (int oy = 0; oy <= maxY; oy += coarse)
+        double bestScore = -1;
+        int bestX = 0, bestY = 0; double bestAngle = 0;
+
+        // ---- rotation search (coarse then fine) ----
+        double aMin = RotationAngleMin, aMax = RotationAngleMax;
+        if (aMax - aMin < 1e-6) { aMin = -180; aMax = 180; }
+        double aStep = Math.Max(5.0, (aMax - aMin) / 24.0);
+        var angles = new List<double>();
+        for (double a = aMin; a <= aMax; a += aStep) angles.Add(a);
+        if (angles.Count == 0) angles.Add(0);
+
+        foreach (double ang in angles)
         {
-            for (int ox = 0; ox <= maxX; ox += coarse)
-            {
-                double dot = 0, iEnergy = 0;
-                for (int ty = 0; ty < th; ty++)
+            double c = Math.Cos(ang * Math.PI / 180.0), s2 = Math.Sin(ang * Math.PI / 180.0);
+            // rotated template
+            var rt = new float[tw * th];
+            for (int ty = 0; ty < th; ty++)
+                for (int tx = 0; tx < tw; tx++)
                 {
-                    int row = (oy + ty) * w + ox;
-                    int tRow = ty * tw;
-                    for (int tx = 0; tx < tw; tx++)
-                    {
-                        float iv = mag[row + tx];
-                        dot += tNorm[tRow + tx] * iv;
-                        iEnergy += iv * iv;
-                    }
+                    double dx = tx - tw / 2.0, dy = ty - th / 2.0;
+                    double sx = c * dx + s2 * dy + tw / 2.0;
+                    double sy = -s2 * dx + c * dy + th / 2.0;
+                    int x0 = (int)Math.Floor(sx), y0 = (int)Math.Floor(sy);
+                    if (x0 < 0 || y0 < 0 || x0 >= tw - 1 || y0 >= th - 1) continue;
+                    double fx = sx - x0, fy = sy - y0;
+                    rt[ty * tw + tx] = (float)(
+                        tNorm[y0 * tw + x0] * (1 - fx) * (1 - fy) +
+                        tNorm[y0 * tw + x0 + 1] * fx * (1 - fy) +
+                        tNorm[(y0 + 1) * tw + x0] * (1 - fx) * fy +
+                        tNorm[(y0 + 1) * tw + x0 + 1] * fx * fy);
                 }
-                double denom = tEnergy * Math.Sqrt(iEnergy);
-                double c = denom > 1e-9 ? dot / denom : 0;
-                if (c > bestCoarse) { bestCoarse = c; bestX = ox; bestY = oy; }
+            double rtEnergy = 0;
+            for (int i = 0; i < rt.Length; i++) rtEnergy += rt[i] * rt[i];
+            if (rtEnergy <= 1e-9) continue;
+            rtEnergy = Math.Sqrt(rtEnergy);
+
+            for (int oy = 0; oy <= maxY; oy += coarse)
+            {
+                for (int ox = 0; ox <= maxX; ox += coarse)
+                {
+                    double dot = 0, iEnergy = 0;
+                    for (int ty = 0; ty < th; ty++)
+                    {
+                        int row = (oy + ty) * w + ox;
+                        int tRow = ty * tw;
+                        for (int tx = 0; tx < tw; tx++)
+                        {
+                            float iv = mag[row + tx];
+                            dot += rt[tRow + tx] * iv;
+                            iEnergy += iv * iv;
+                        }
+                    }
+                    double denom = rtEnergy * Math.Sqrt(iEnergy);
+                    double cc = denom > 1e-9 ? dot / denom : 0;
+                    if (cc > bestScore) { bestScore = cc; bestX = ox; bestY = oy; bestAngle = ang; }
+                }
             }
         }
-        if (bestCoarse <= 0) return results;
+        if (bestScore <= 0) return results;
 
-        // ---- fine pass (step = 1) around the coarse peak ----
+        // fine pass around the best angle/position
         int win = coarse * 2;
-        double bestFine = -1;
-        int fineX = bestX, fineY = bestY;
-        for (int oy = Math.Max(0, bestY - win); oy <= Math.Min(maxY, bestY + win); oy++)
+        double fineBest = bestScore; int fineX2 = bestX, fineY2 = bestY; double fineA = bestAngle;
+        for (double ang = bestAngle - aStep; ang <= bestAngle + aStep; ang += Math.Max(1.0, aStep / 5))
         {
-            for (int ox = Math.Max(0, bestX - win); ox <= Math.Min(maxX, bestX + win); ox++)
-            {
-                double dot = 0, iEnergy = 0;
-                for (int ty = 0; ty < th; ty++)
+            double c = Math.Cos(ang * Math.PI / 180.0), s2 = Math.Sin(ang * Math.PI / 180.0);
+            var rt = new float[tw * th];
+            for (int ty = 0; ty < th; ty++)
+                for (int tx = 0; tx < tw; tx++)
                 {
-                    int row = (oy + ty) * w + ox;
-                    int tRow = ty * tw;
-                    for (int tx = 0; tx < tw; tx++)
-                    {
-                        float iv = mag[row + tx];
-                        dot += tNorm[tRow + tx] * iv;
-                        iEnergy += iv * iv;
-                    }
+                    double dx = tx - tw / 2.0, dy = ty - th / 2.0;
+                    double sx = c * dx + s2 * dy + tw / 2.0;
+                    double sy = -s2 * dx + c * dy + th / 2.0;
+                    int x0 = (int)Math.Floor(sx), y0 = (int)Math.Floor(sy);
+                    if (x0 < 0 || y0 < 0 || x0 >= tw - 1 || y0 >= th - 1) continue;
+                    double ffx = sx - x0, ffy = sy - y0;
+                    rt[ty * tw + tx] = (float)(
+                        tNorm[y0 * tw + x0] * (1 - ffx) * (1 - ffy) +
+                        tNorm[y0 * tw + x0 + 1] * ffx * (1 - ffy) +
+                        tNorm[(y0 + 1) * tw + x0] * (1 - ffx) * ffy +
+                        tNorm[(y0 + 1) * tw + x0 + 1] * ffx * ffy);
                 }
-                double denom = tEnergy * Math.Sqrt(iEnergy);
-                double c = denom > 1e-9 ? dot / denom : 0;
-                if (c > bestFine) { bestFine = c; fineX = ox; fineY = oy; }
+            double rtEnergy = 0;
+            for (int i = 0; i < rt.Length; i++) rtEnergy += rt[i] * rt[i];
+            if (rtEnergy <= 1e-9) continue;
+            rtEnergy = Math.Sqrt(rtEnergy);
+            for (int oy = Math.Max(0, bestY - win); oy <= Math.Min(maxY, bestY + win); oy++)
+            {
+                for (int ox = Math.Max(0, bestX - win); ox <= Math.Min(maxX, bestX + win); ox++)
+                {
+                    double dot = 0, iEnergy = 0;
+                    for (int ty = 0; ty < th; ty++)
+                    {
+                        int row = (oy + ty) * w + ox;
+                        int tRow = ty * tw;
+                        for (int tx = 0; tx < tw; tx++)
+                        {
+                            float iv = mag[row + tx];
+                            dot += rt[tRow + tx] * iv;
+                            iEnergy += iv * iv;
+                        }
+                    }
+                    double denom = rtEnergy * Math.Sqrt(iEnergy);
+                    double cc = denom > 1e-9 ? dot / denom : 0;
+                    if (cc > fineBest) { fineBest = cc; fineX2 = ox; fineY2 = oy; fineA = ang; }
+                }
             }
         }
 
-        // ---- verify with featurelet coverage ----
-        double originX = fineX + Pattern.OriginX;
-        double originY = fineY + Pattern.OriginY;
+        // verify with featurelet coverage
+        double originX = fineX2 + Pattern.OriginX;
+        double originY = fineY2 + Pattern.OriginY;
         int matched = 0;
         foreach (var ft in Pattern.Featurelets)
         {
@@ -505,7 +561,7 @@ public sealed class PatMaxTool
         {
             Score = Math.Max(0, Math.Min(1, coverage)),
             X = originX, Y = originY,
-            Angle = 0, Scale = 1.0,
+            Angle = fineA, Scale = 1.0,
             Coverage = coverage,
             MatchedFeatures = matched,
             BadFeatures = Pattern.FeatureCount - matched,

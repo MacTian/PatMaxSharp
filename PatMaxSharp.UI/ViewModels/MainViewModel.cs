@@ -393,6 +393,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _tool.PreSmoothSigma = PreSmoothSigma;
             _tool.AcceptThreshold = AcceptThreshold;
             _tool.ContrastThreshold = ContrastThreshold;
+            _tool.RotationAngleMin = RotationAngleMin;
+            _tool.RotationAngleMax = RotationAngleMax;
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var results = _tool.Run(gray, MaxResults);
