@@ -116,6 +116,34 @@ PatMaxSharp/
 
 ---
 
+### Results drawn on the image
+
+Match results are **drawn directly on the image**:
+
+```
+  ┌─────────────────────────────────────────┐
+  │        ┌───┐                            │
+  │        │ + │ <- cross = match position   │
+  │        └───┘                            │
+  │          ╲                              │
+  │           ╲  <- arrow = angle          │
+  │      ┌─────────┐                        │
+  │      │ ░░░░░░░ │ <- dashed box = scale  │
+  │      └─────────┘                        │
+  └─────────────────────────────────────────┘
+  Color: green = accepted, orange = rejected
+```
+
+### Processing time & speed
+
+The status bar shows live metrics:
+
+```
+Processing time: 45.2 ms   Throughput: 1.24 Mpx/s   Results: 3
+```
+
+---
+
 ## 5. Core Algorithms (Recovered)
 
 ### 4.1 Gabor Edge Detection
