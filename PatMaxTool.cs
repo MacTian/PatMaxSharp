@@ -412,7 +412,7 @@ public sealed class PatMaxTool
     private List<MatchResult> MatchByTemplate(GaborEdgeDetector.EdgeMap edges)
     {
         var results = new List<MatchResult>();
-        if (!Pattern.HasTemplate) return results;
+        if (Pattern == null || Pattern.FeatureCount == 0) return results;
 
         int tw = Pattern.TemplateWidth, th = Pattern.TemplateHeight;
         int w = edges.Width, h = edges.Height;
@@ -428,20 +428,21 @@ public sealed class PatMaxTool
         if (tEnergy <= 1e-9) return results;
         tEnergy = Math.Sqrt(tEnergy);
 
-        int step = Math.Max(1, PrecisionStep);
-        int maxX = w - tw, maxY = h - th;
-        var corr = new double[maxX + 1, maxY + 1];
-        double best = -1;
-
         // search image magnitude
         var mag = new float[w * h];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
                 mag[y * w + x] = edges.GetMagnitude(x, y);
 
-        for (int oy = 0; oy <= maxY; oy += step)
+        int maxX = w - tw, maxY = h - th;
+
+        // ---- coarse pass (step = 4) ----
+        int coarse = Math.Max(2, PrecisionStep * 2);
+        double bestCoarse = -1;
+        int bestX = 0, bestY = 0;
+        for (int oy = 0; oy <= maxY; oy += coarse)
         {
-            for (int ox = 0; ox <= maxX; ox += step)
+            for (int ox = 0; ox <= maxX; ox += coarse)
             {
                 double dot = 0, iEnergy = 0;
                 for (int ty = 0; ty < th; ty++)
@@ -457,78 +458,62 @@ public sealed class PatMaxTool
                 }
                 double denom = tEnergy * Math.Sqrt(iEnergy);
                 double c = denom > 1e-9 ? dot / denom : 0;
-                corr[ox, oy] = c;
-                if (c > best) best = c;
+                if (c > bestCoarse) { bestCoarse = c; bestX = ox; bestY = oy; }
             }
         }
+        if (bestCoarse <= 0) return results;
 
-        // DEBUG: NCC at the expected origin
-        if (System.Environment.GetEnvironmentVariable("PMA_NCC") == "1")
+        // ---- fine pass (step = 1) around the coarse peak ----
+        int win = coarse * 2;
+        double bestFine = -1;
+        int fineX = bestX, fineY = bestY;
+        for (int oy = Math.Max(0, bestY - win); oy <= Math.Min(maxY, bestY + win); oy++)
         {
-            int eox = (int)Math.Round(Pattern.OriginX - 0); // top-left that puts origin at origin
-            int eoy = 0;
-            // find the correlation value closest to the expected origin
-            Console.WriteLine($"[NCC] best={best:F4} tEnergy={tEnergy:F1}");
-            for (int oy = 0; oy <= maxY; oy += step)
-                for (int ox = 0; ox <= maxX; ox += step)
-                {
-                    double c = corr[ox, oy];
-                    if (c > 0.5)
-                        Console.WriteLine($"[NCC] ox={ox} oy={oy} c={c:F4} origin=({ox + Pattern.OriginX:F0},{oy + Pattern.OriginY:F0})");
-                }
-        }
-        // peaks above threshold
-        double threshold = best * PeakDetector.MaxAcceptablePeakFraction;
-        var taken = new bool[maxX + 1, maxY + 1];
-        int win = Math.Max(1, PeakDetector.PeakSeparationThreshold / step);
-        for (int oy = 0; oy <= maxY; oy++)
-        {
-            for (int ox = 0; ox <= maxX; ox++)
+            for (int ox = Math.Max(0, bestX - win); ox <= Math.Min(maxX, bestX + win); ox++)
             {
-                double c = corr[ox, oy];
-                if (c < threshold) continue;
-                bool isMax = true;
-                for (int dy = -win; dy <= win && isMax; dy++)
-                    for (int dx = -win; dx <= win && isMax; dx++)
+                double dot = 0, iEnergy = 0;
+                for (int ty = 0; ty < th; ty++)
+                {
+                    int row = (oy + ty) * w + ox;
+                    int tRow = ty * tw;
+                    for (int tx = 0; tx < tw; tx++)
                     {
-                        int nx = ox + dx, ny = oy + dy;
-                        if (nx < 0 || ny < 0 || nx <= maxX && ny <= maxY) continue;
-                        if (nx < 0 || ny < 0 || nx > maxX || ny > maxY) continue;
-                        if (corr[nx, ny] > c) { isMax = false; break; }
+                        float iv = mag[row + tx];
+                        dot += tNorm[tRow + tx] * iv;
+                        iEnergy += iv * iv;
                     }
-                if (!isMax) continue;
-
-                // origin = top-left of the match + the pattern origin offset
-                double originX = ox + Pattern.OriginX;
-                double originY = oy + Pattern.OriginY;
-                int matched = 0;
-                foreach (var ft in Pattern.Featurelets)
-                {
-                    int ix = (int)Math.Round(originX + ft.X - Pattern.OriginX);
-                    int iy = (int)Math.Round(originY + ft.Y - Pattern.OriginY);
-                    if (ix >= 0 && iy >= 0 && ix < w && iy < h && edges.GetMagnitude(ix, iy) > 0) matched++;
                 }
-                double coverage = Pattern.FeatureCount > 0 ? (double)matched / Pattern.FeatureCount : 0;
-                results.Add(new MatchResult
-                {
-                    Score = Math.Max(0, Math.Min(1, coverage)),
-                    X = originX, Y = originY,
-                    Angle = 0, Scale = 1.0,
-                    Coverage = Pattern.FeatureCount > 0 ? (double)matched / Pattern.FeatureCount : 0,
-                    MatchedFeatures = matched,
-                    BadFeatures = Pattern.FeatureCount - matched,
-                    Accepted = c >= AcceptThreshold
-                });
+                double denom = tEnergy * Math.Sqrt(iEnergy);
+                double c = denom > 1e-9 ? dot / denom : 0;
+                if (c > bestFine) { bestFine = c; fineX = ox; fineY = oy; }
             }
         }
-        results.Sort((a, b) => b.Score.CompareTo(a.Score));
+
+        // ---- verify with featurelet coverage ----
+        double originX = fineX + Pattern.OriginX;
+        double originY = fineY + Pattern.OriginY;
+        int matched = 0;
+        foreach (var ft in Pattern.Featurelets)
+        {
+            int ix = (int)Math.Round(originX + ft.X - Pattern.OriginX);
+            int iy = (int)Math.Round(originY + ft.Y - Pattern.OriginY);
+            if (ix >= 0 && iy >= 0 && ix < w && iy < h && edges.GetMagnitude(ix, iy) > 0) matched++;
+        }
+        double coverage = (double)matched / Pattern.FeatureCount;
+
+        results.Add(new MatchResult
+        {
+            Score = Math.Max(0, Math.Min(1, coverage)),
+            X = originX, Y = originY,
+            Angle = 0, Scale = 1.0,
+            Coverage = coverage,
+            MatchedFeatures = matched,
+            BadFeatures = Pattern.FeatureCount - matched,
+            Accepted = coverage >= AcceptThreshold
+        });
         return results;
     }
 
-    /// <summary>
-    /// Robust grid search: find the origin where the most featurelets land on
-    /// an edge. Independent of angle conventions, so it is reliable.
-    /// </summary>
     private List<MatchResult> MatchByGrid(GaborEdgeDetector.EdgeMap edges)
     {
         var results = new List<MatchResult>();

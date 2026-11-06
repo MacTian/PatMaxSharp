@@ -58,18 +58,18 @@ public sealed class GrayImage
         for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
                 img[x, y] = (byte)(128 + 40 * Math.Sin(x / 32.0) * Math.Cos(y / 32.0));
-        // a bright rectangle "object"
-        int bw = width / 3, bh = height / 3;
-        int bx = width / 3, by = height / 3;
+        // A single, clearly distinct object on a near-uniform background:
+        // a bright square with a dark hole — a unique signature.
+        int bw = width / 4, bh = height / 4;
+        int bx = width / 2 - bw / 2, by = height / 2 - bh / 2;
         for (int y = by; y < by + bh; y++)
             for (int x = bx; x < bx + bw; x++)
-                img[x, y] = 220;
-        // a dark circle inside
+                img[x, y] = 240;
         int cx = bx + bw / 2, cy = by + bh / 2, r = Math.Min(bw, bh) / 4;
         for (int y = cy - r; y <= cy + r; y++)
             for (int x = cx - r; x <= cx + r; x++)
                 if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r)
-                    img[x, y] = 40;
+                    img[x, y] = 20;
         return img;
     }
 }
