@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -90,6 +92,17 @@ public sealed class ImageRegionSelector : Control
         DependencyProperty.Register(nameof(Zoom), typeof(double), typeof(ImageRegionSelector),
             new PropertyMetadata(1.0));
     public double Zoom { get => (double)GetValue(ZoomProperty); set => SetValue(ZoomProperty, value); }
+
+    /// <summary>Result markers drawn on the image (position + angle).</summary>
+    public static readonly DependencyProperty MarkersProperty =
+        DependencyProperty.Register(nameof(Markers), typeof(List<MatchMarker>), typeof(ImageRegionSelector),
+            new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
+
+    public List<MatchMarker> Markers
+    {
+        get => (List<MatchMarker>)GetValue(MarkersProperty);
+        set => SetValue(MarkersProperty, value);
+    }
     #endregion
 
     public event Action<Rect?>? RegionChanged;
@@ -231,13 +244,87 @@ public sealed class ImageRegionSelector : Control
             Canvas.SetLeft(_searchRect, sr.X * Zoom); Canvas.SetTop(_searchRect, sr.Y * Zoom);
         }
         else _searchRect.Visibility = Visibility.Collapsed;
+
+        // Draw match markers (position + angle arrow + score)
+        if (Markers != null)
+        {
+            // remove previous markers first
+            var toRemove = _canvas.Children
+                .OfType<FrameworkElement>()
+                .Where(fe => fe.Tag is MatchMarkerTag)
+                .ToList();
+            foreach (var el in toRemove) _canvas.Children.Remove(el);
+
+            foreach (var m in Markers)
+            {
+                var pos = m.DisplayPos(Zoom);
+                double s = m.Size * Zoom * m.Scale;
+                double a = m.AngleDeg * Math.PI / 180.0;
+                var brush = m.Accepted ? Brushes.Lime : Brushes.Orange;
+
+                // cross at the match position
+                var crossH = new Line
+                {
+                    X1 = pos.X - 8 * Zoom, Y1 = pos.Y, X2 = pos.X + 8 * Zoom, Y2 = pos.Y,
+                    Stroke = brush, StrokeThickness = 2
+                };
+                var crossV = new Line
+                {
+                    X1 = pos.X, Y1 = pos.Y - 8 * Zoom, X2 = pos.X, Y2 = pos.Y + 8 * Zoom,
+                    Stroke = brush, StrokeThickness = 2
+                };
+                // angle arrow
+                var arrow = new Line
+                {
+                    X1 = pos.X, Y1 = pos.Y,
+                    X2 = pos.X + Math.Cos(a) * s, Y2 = pos.Y + Math.Sin(a) * s,
+                    Stroke = brush, StrokeThickness = 2
+                };
+                // bounding box
+                var box = new Rectangle
+                {
+                    Width = s * 2, Height = s * 2,
+                    Stroke = brush, StrokeThickness = 1.5,
+                    StrokeDashArray = new DoubleCollection { 3, 2 },
+                    Fill = Brushes.Transparent
+                };
+                Canvas.SetLeft(box, pos.X - s);
+                Canvas.SetTop(box, pos.Y - s);
+
+                _canvas.Children.Add(box);
+                _canvas.Children.Add(crossH);
+                _canvas.Children.Add(crossV);
+                _canvas.Children.Add(arrow);
+                box.Tag = new MatchMarkerTag { Marker = m };
+                crossH.Tag = new MatchMarkerTag { Marker = m };
+                crossV.Tag = new MatchMarkerTag { Marker = m };
+                arrow.Tag = new MatchMarkerTag { Marker = m };
+            }
+        }
     }
+
+    private sealed class MatchMarkerTag { public MatchMarker Marker { get; set; } }
 
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
         Setup();
     }
+}
+
+/// <summary>A match result marker drawn on the image.</summary>
+public sealed class MatchMarker
+{
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double AngleDeg { get; set; }
+    public double Scale { get; set; } = 1.0;
+    public double Score { get; set; }
+    public bool Accepted { get; set; }
+    public double Size { get; set; } = 24;
+
+    /// <summary>Image pixel coordinates (already scaled to display).</summary>
+    public Point DisplayPos(double zoom) => new Point(X * zoom, Y * zoom);
 }
 
 public enum RegionKind { Train, Search }

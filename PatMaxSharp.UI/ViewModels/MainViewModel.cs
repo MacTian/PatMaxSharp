@@ -10,6 +10,7 @@ using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using PatMaxSharp;
 using PatMaxSharp.Core;
+using PatMaxSharp.UI.Controls;
 
 namespace PatMaxSharp.UI.ViewModels;
 
@@ -78,6 +79,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool ScoreUsingClutter { get; set; } = true;
 
     public ObservableCollection<MatchResult> Results { get; } = new();
+
+    /// <summary>Markers drawn on the image (position + angle + score).</summary>
+    public List<MatchMarker> Markers { get; private set; } = new();
+
+    /// <summary>Last run processing time (ms).</summary>
+    public double ProcessingTimeMs { get; private set; }
+
+    /// <summary>Last run throughput (Mpx/s).</summary>
+    public double ThroughputMpxs { get; private set; }
     #endregion
 
     private void OpenImage()
@@ -153,7 +163,27 @@ public sealed class MainViewModel : INotifyPropertyChanged
             sw.Stop();
 
             Results.Clear();
-            foreach (var r in results) Results.Add(r);
+            var markers = new List<MatchMarker>();
+            foreach (var r in results)
+            {
+                Results.Add(r);
+                markers.Add(new MatchMarker
+                {
+                    X = r.X, Y = r.Y,
+                    AngleDeg = r.Angle * 180 / Math.PI,
+                    Scale = r.Scale,
+                    Score = r.Score,
+                    Accepted = r.Accepted,
+                    Size = Math.Max(12, Math.Sqrt(Math.Max(1, r.MatchedFeatures)) * 1.5)
+                });
+            }
+            Markers = markers;
+            ProcessingTimeMs = sw.Elapsed.TotalMilliseconds;
+            ThroughputMpxs = (gray.Width * gray.Height / 1_000_000.0) / (sw.Elapsed.TotalSeconds > 0 ? sw.Elapsed.TotalSeconds : 1e-9);
+
+            OnPropertyChanged(nameof(Markers));
+            OnPropertyChanged(nameof(ProcessingTimeMs));
+            OnPropertyChanged(nameof(ThroughputMpxs));
 
             Status = $"找到 {Results.Count} 个结果, 耗时 {sw.ElapsedMilliseconds} ms";
         }

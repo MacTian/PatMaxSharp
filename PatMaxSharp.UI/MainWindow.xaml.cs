@@ -18,19 +18,13 @@ public partial class MainWindow : Window
         rbTrain.Checked += (_, _) => viewer.SelectMode = RegionKind.Train;
         rbSearch.Checked += (_, _) => viewer.SelectMode = RegionKind.Search;
 
-        // Notify the view model that the region properties changed (binding refresh)
-        viewer.RegionChanged += _ =>
+        viewer.RegionChanged += _ => _vm.RefreshRegions();
+        _vm.PropertyChanged += (_, e) =>
         {
-            _vm.NotifyRegionChanged();
+            if (e.PropertyName == nameof(MainViewModel.ProcessingTimeMs))
+                timeText.Text = $"{_vm.ProcessingTimeMs:F1}";
+            if (e.PropertyName == nameof(MainViewModel.ThroughputMpxs))
+                tputText.Text = $"{_vm.ThroughputMpxs:F2}";
         };
-    }
-}
-
-/// <summary>Helper extension so the view model can refresh region bindings.</summary>
-public static class VmExtensions
-{
-    public static void NotifyRegionChanged(this MainViewModel vm)
-    {
-        vm.RefreshRegions();
     }
 }
