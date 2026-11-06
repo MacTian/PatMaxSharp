@@ -14,11 +14,6 @@
             <Setter Property="Foreground" Value="#CCC"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style TargetType="Button">
-            <Setter Property="Margin" Value="4"/>
-            <Setter Property="Padding" Value="12,5"/>
-            <Setter Property="MinWidth" Value="90"/>
-        </Style>
         <Style TargetType="Slider">
             <Setter Property="Margin" Value="2"/>
         </Style>
@@ -27,6 +22,7 @@
             <Setter Property="Margin" Value="2"/>
         </Style>
         <Style TargetType="Button">
+            <Setter Property="MinWidth" Value="90"/>
             <Setter Property="Background" Value="#4A4A4A"/>
             <Setter Property="Foreground" Value="#F0F0F0"/>
             <Setter Property="BorderBrush" Value="#6A6A6A"/>
