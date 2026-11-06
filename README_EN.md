@@ -134,6 +134,17 @@ Match results are **drawn directly on the image**:
   Color: green = accepted, orange = rejected
 ```
 
+### Selection highlighting
+
+Clicking a row in the results grid **highlights** the corresponding marker on the image:
+
+```
+Before selection: green marker (accepted) / orange marker (rejected)
+After selection:  yellow thicker marker + auto-scroll to the row
+```
+
+Two-way linked: image marker <-> results grid row.
+
 ### Processing time & speed
 
 The status bar shows live metrics:
