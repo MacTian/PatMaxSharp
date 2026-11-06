@@ -19,6 +19,7 @@ public partial class MainWindow : Window
         rbSearch.Checked += (_, _) => viewer.SelectMode = RegionKind.Search;
 
         viewer.RegionChanged += _ => _vm.RefreshRegions();
+
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.ProcessingTimeMs))
@@ -32,5 +33,13 @@ public partial class MainWindow : Window
                 resultsGrid.ScrollIntoView(_vm.SelectedResult);
             }
         };
+    }
+
+    private void ApplyPreset_Click(object sender, RoutedEventArgs e)
+    {
+        _vm.ApplyPreset(_vm.SelectedPreset);
+        // refresh all parameter bindings after a preset is applied
+        DataContext = null;
+        DataContext = _vm;
     }
 }

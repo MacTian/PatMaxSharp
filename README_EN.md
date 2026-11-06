@@ -134,6 +134,26 @@ Match results are **drawn directly on the image**:
   Color: green = accepted, orange = rejected
 ```
 
+### Parameter presets
+
+5 built-in presets + user-defined (saved to local AppData, auto-loaded on startup):
+
+| Preset | Use case |
+|---|---|
+| **Default** | Balanced configuration for general use |
+| **High Precision** | Sub-pixel + fine grain, slower |
+| **High Speed** | Coarse grain + large step, fast screening |
+| **Robust** | Gaussian smooth + large cluster, noise/occlusion resistant |
+| **Multi-Target** | Find multiple targets, low overlap threshold |
+
+**Actions**:
+```
+Dropdown preset -> [Apply]   apply to current parameters
+[New]                        create a preset from current parameters
+[Save]                       save changes (JSON in %LocalAppData%\PatMaxSharp\Presets)
+[Delete]                     delete a user preset (built-ins are protected)
+```
+
 ### Selection highlighting
 
 Clicking a row in the results grid **highlights** the corresponding marker on the image:

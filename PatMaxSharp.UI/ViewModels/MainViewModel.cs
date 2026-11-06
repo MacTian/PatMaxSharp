@@ -1,10 +1,12 @@
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
@@ -32,6 +34,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         TrainCommand = new RelayCommand(_ => Train(), _ => _image != null && TrainRegion.HasValue);
         RunCommand = new RelayCommand(_ => Run(), _ => _trained && _image != null);
         ClearCommand = new RelayCommand(_ => Clear(), _ => _image != null);
+        SavePresetCommand = new RelayCommand(_ => SavePreset());
+        NewPresetCommand = new RelayCommand(_ => NewPreset());
+        DeletePresetCommand = new RelayCommand(_ => DeletePreset(), _ => SelectedPreset != null && !IsBuiltIn(SelectedPreset));
+
+        Presets = new ObservableCollection<ParameterPreset>(ParameterPreset.BuiltIn());
+        LoadUserPresets();
+        SelectedPreset = Presets.FirstOrDefault();
+        ApplyPreset(SelectedPreset);
     }
 
     #region Commands
@@ -39,6 +49,119 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand TrainCommand { get; }
     public ICommand RunCommand { get; }
     public ICommand ClearCommand { get; }
+    public ICommand SavePresetCommand { get; }
+    public ICommand NewPresetCommand { get; }
+    public ICommand DeletePresetCommand { get; }
+    #endregion
+
+    #region Presets
+    public ObservableCollection<ParameterPreset> Presets { get; } = new();
+    public ParameterPreset SelectedPreset { get; set; }
+
+    private string PresetDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PatMaxSharp", "Presets");
+
+    private static bool IsBuiltIn(ParameterPreset p) =>
+        ParameterPreset.BuiltIn().Any(b => b.Name == p.Name);
+
+    private void LoadUserPresets()
+    {
+        try
+        {
+            Directory.CreateDirectory(PresetDir);
+            foreach (var file in Directory.GetFiles(PresetDir, "*.json"))
+            {
+                try { Presets.Add(ParameterPreset.FromJson(File.ReadAllText(file))); }
+                catch { /* skip corrupt preset */ }
+            }
+        }
+        catch { /* ignore */ }
+    }
+
+    /// <summary>Apply a preset to the live parameters.</summary>
+    public void ApplyPreset(ParameterPreset p)
+    {
+        if (p == null) return;
+        RotationAngleMin = p.RotationAngleMin;
+        RotationAngleMax = p.RotationAngleMax;
+        ScaleMin = p.ScaleMin;
+        ScaleMax = p.ScaleMax;
+        ApproximateNumberToFind = p.ApproximateNumberToFind;
+        XYOverlap = p.XYOverlap;
+        TimeoutMs = p.TimeoutMs;
+        AcceptThreshold = p.AcceptThreshold;
+        ContrastThreshold = p.ContrastThreshold;
+        Grain = p.Grain;
+        CoarseGrainLimit = p.CoarseGrainLimit;
+        FineGrainLimit = p.FineGrainLimit;
+        ScoreUsingClutter = p.ScoreUsingClutter;
+        MaxResults = p.MaxResults;
+        PrecisionStep = p.PrecisionStep;
+        SubpixelRefinement = p.SubpixelRefinement;
+        EnableClustering = p.EnableClustering;
+        ClusterRadius = p.ClusterRadius;
+        PreSmoothSigma = p.PreSmoothSigma;
+        UseSimd = p.UseSimd;
+        UseParallel = p.UseParallel;
+        OnPropertyChanged(string.Empty);
+    }
+
+    private ParameterPreset CaptureCurrent(string name, string description = "")
+    {
+        return new ParameterPreset
+        {
+            Name = name, Description = description,
+            RotationAngleMin = RotationAngleMin, RotationAngleMax = RotationAngleMax,
+            ScaleMin = ScaleMin, ScaleMax = ScaleMax,
+            ApproximateNumberToFind = ApproximateNumberToFind, XYOverlap = XYOverlap, TimeoutMs = TimeoutMs,
+            AcceptThreshold = AcceptThreshold, ContrastThreshold = ContrastThreshold,
+            Grain = Grain, CoarseGrainLimit = CoarseGrainLimit, FineGrainLimit = FineGrainLimit,
+            ScoreUsingClutter = ScoreUsingClutter, MaxResults = MaxResults,
+            PrecisionStep = PrecisionStep, SubpixelRefinement = SubpixelRefinement,
+            EnableClustering = EnableClustering, ClusterRadius = ClusterRadius,
+            PreSmoothSigma = PreSmoothSigma, UseSimd = UseSimd, UseParallel = UseParallel
+        };
+    }
+
+    private void NewPreset()
+    {
+        var p = CaptureCurrent("新建预设", "");
+        Presets.Add(p);
+        SelectedPreset = p;
+        Status = $"已创建预设: {p.Name}";
+    }
+
+    private void SavePreset()
+    {
+        try
+        {
+            var p = SelectedPreset ?? CaptureCurrent("默认");
+            p = CaptureCurrent(p.Name, p.Description);
+            Directory.CreateDirectory(PresetDir);
+            File.WriteAllText(Path.Combine(PresetDir, $"{p.Name}.json"), p.ToJson());
+
+            // replace in the list
+            int idx = Presets.IndexOf(SelectedPreset);
+            if (idx >= 0) Presets[idx] = p; else Presets.Add(p);
+            SelectedPreset = p;
+            Status = $"预设已保存: {p.Name}";
+        }
+        catch (Exception ex) { Status = $"保存失败: {ex.Message}"; }
+    }
+
+    private void DeletePreset()
+    {
+        try
+        {
+            if (SelectedPreset == null) return;
+            var file = Path.Combine(PresetDir, $"{SelectedPreset.Name}.json");
+            if (File.Exists(file)) File.Delete(file);
+            Presets.Remove(SelectedPreset);
+            SelectedPreset = Presets.FirstOrDefault();
+            Status = "预设已删除";
+        }
+        catch (Exception ex) { Status = $"删除失败: {ex.Message}"; }
+    }
     #endregion
 
     #region Properties

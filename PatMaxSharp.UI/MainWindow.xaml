@@ -143,6 +143,24 @@
                         </StackPanel>
                     </GroupBox>
 
+                    <!-- Preset management -->
+                    <GroupBox Header="5. 参数预设">
+                        <StackPanel>
+                            <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
+                                      DisplayMemberPath="Name" Margin="2" ToolTip="{Binding SelectedPreset.Description}"/>
+                            <TextBlock Text="{Binding SelectedPreset.Description}" Foreground="#888"
+                                       FontSize="11" Margin="2" TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <Button Content="应用" Click="ApplyPreset_Click" Padding="10,4"/>
+                                <Button Content="新建" Command="{Binding NewPresetCommand}" Padding="10,4"/>
+                                <Button Content="保存" Command="{Binding SavePresetCommand}" Padding="10,4"/>
+                                <Button Content="删除" Command="{Binding DeletePresetCommand}" Padding="10,4"/>
+                            </StackPanel>
+                            <TextBlock Text="预设保存在本地 AppData，重启后自动加载" Foreground="#666"
+                                       FontSize="10" Margin="2,4,0,0"/>
+                        </StackPanel>
+                    </GroupBox>
+
                     <!-- Performance parameters -->
                     <GroupBox Header="4. 性能 / 精度">
                         <StackPanel>
