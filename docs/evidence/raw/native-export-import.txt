@@ -1,0 +1,72 @@
+# exports
+ord=1    rva=0x00361CC0  C_ccADLinkInt_ClearLastHardwareError
+ord=2    rva=0x00361CD0  C_ccADLinkInt_GetBoardModel
+ord=3    rva=0x00361CE0  C_ccADLinkInt_GetBoardSeries
+ord=4    rva=0x00361D00  C_ccADLinkInt_GetCustomerEEPROMSize
+ord=5    rva=0x00361D10  C_ccADLinkInt_GetDeviceName
+ord=6    rva=0x00361D20  C_ccADLinkInt_GetEEPROMName
+ord=7    rva=0x00361D30  C_ccADLinkInt_GetEEPROMReadable
+ord=8    rva=0x00361D40  C_ccADLinkInt_GetEEPROMSize
+ord=9    rva=0x00361D50  C_ccADLinkInt_GetEEPROMWritable
+ord=10   rva=0x00361D60  C_ccADLinkInt_GetIDByteCount
+ord=11   rva=0x00361D70  C_ccADLinkInt_GetIDBytes
+ord=12   rva=0x00361D80  C_ccADLinkInt_GetOSObjectName
+ord=13   rva=0x00361D90  C_ccADLinkInt_GetPorts
+ord=14   rva=0x00361DA0  C_ccADLinkInt_GetSerialIsProgrammable
+ord=15   rva=0x00361DB0  C_ccADLinkInt_GetSerialNumber
+ord=16   rva=0x00361DC0  C_ccADLinkInt_GetVendorBoardName
+ord=17   rva=0x00361DD0  C_ccADLinkInt_GetVendorPartNumber
+ord=18   rva=0x00361DE0  C_ccADLinkInt_GetVendorSerialNumber
+ord=19   rva=0x00361DF0  C_ccADLinkInt_delete
+ord=20   rva=0x00361E10  C_ccADLinkInt_new
+ord=21   rva=0x0035F600  C_ccHardwareInt_FindBoard
+ord=22   rva=0x0035F610  C_ccHardwareInt_GetInterface
+ord=23   rva=0x0035F630  C_ccHardwareInt_GetInterfaceCount
+ord=24   rva=0x0035F640  C_ccHardwareInt_delete
+ord=25   rva=0x0035F660  C_ccHardwareInt_new
+ord=26   rva=0x001755A0  DllCanUnloadNow
+ord=27   rva=0x001755B0  DllGetClassObject
+ord=28   rva=0x001756A0  DllRegisterServer
+ord=29   rva=0x00175790  DllUnregisterServer
+
+# imports
+KERNEL32.dll: PulseEvent, CreateProcessW, GlobalFree, OpenProcess, ProcessIdToSessionId, SetFileTime, FlushFileBuffers, CreateDirectoryW, GetTimeZoneInformation, FileTimeToSystemTime, IsBadReadPtr, AreFileApisANSI, OpenFileMappingW, GetCurrentDirectoryW, SetCurrentDirectoryW, LocalAlloc, ExitProcess, ReadFile, GetFullPathNameW, CreateFileW, GetFileSizeEx, GetFileTime, SetEndOfFile, SetFilePointer, DeleteFileW, lstrcmpiW, FindResourceW, SizeofResource, LoadResource, LoadLibraryExW, GetProcAddress, GetModuleHandleW, FreeLibrary, RaiseException, EncodePointer, MultiByteToWideChar, LocalFree, GetModuleFileNameW, GetVersion, GetCurrentThreadId, Sleep, DeleteCriticalSection, InitializeCriticalSectionAndSpinCount, LeaveCriticalSection, EnterCriticalSection, GetLastError, DecodePointer, FindFirstFileW, GetExitCodeProcess, FindClose, TerminateProcess, SetUnhandledExceptionFilter, UnhandledExceptionFilter, RtlLookupFunctionEntry, RtlCaptureContext, InitializeSListHead, SleepConditionVariableSRW, WakeAllConditionVariable, GetUserDefaultLCID, GetComputerNameW, lstrcatW, lstrcpyW, lstrcpynW, GetUserDefaultUILanguage
+USER32.dll: CharUpperBuffW, MsgWaitForMultipleObjectsEx, MessageBoxW, CharLowerBuffW, PostThreadMessageW, TranslateMessage, GetUserObjectInformationW, GetProcessWindowStation, LoadStringW, DispatchMessageW, PeekMessageW, CharNextW
+ADVAPI32.dll: DeregisterEventSource, ReportEventW, RegQueryValueExW, InitializeSecurityDescriptor, SetSecurityDescriptorDacl, RegOpenKeyExA, CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceStatus, StartServiceW, RegOpenKeyW, CryptAcquireContextW, CryptReleaseContext, CryptGenRandom, CryptDestroyKey, CryptSetHashParam, CryptGetProvParam, CryptGetUserKey, CryptExportKey, CryptDecrypt, CryptCreateHash, CryptDestroyHash, QueryServiceStatusEx, ConvertStringSecurityDescriptorToSecurityDescriptorW, SetSecurityDescriptorSacl, RegCloseKey, RegCreateKeyExW, RegDeleteKeyW, RegDeleteValueW, RegEnumKeyExW, RegOpenKeyExW, RegQueryInfoKeyW, RegSetValueExW, CryptSignHashW, GetSecurityDescriptorSacl, QueryServiceConfigW, RegFlushKey, RegEnumValueW, GetUserNameW, CryptEnumProvidersW, RegisterEventSourceW
+ole32.dll: CoTaskMemFree, CoTaskMemAlloc, StringFromGUID2, CLSIDFromString, CoInitializeEx, CoUninitialize, CreateStreamOnHGlobal, ProgIDFromCLSID, CoCreateFreeThreadedMarshaler, CoCreateInstance, CoTaskMemRealloc, StringFromCLSID, CLSIDFromProgID
+OLEAUT32.dll: #6, #7, #176, #26, #4, #149, #25, #186, #163, #277, #200, #411, #162, #161, #314, #12, #11, #10, #9, #8, #27, #24, #23, #16, #15, #150, #20, #19, #202, #2, #201, #313, #17
+kernel32.dll: 
+MSVCP140.dll: ??Bios_base@std@@QEBA_NXZ, ??7ios_base@std@@QEBA_NXZ, ?_Xlength_error@std@@YAXPEBD@Z, ?uncaught_exception@std@@YA_NXZ, ?good@ios_base@std@@QEBA_NXZ, ?flags@ios_base@std@@QEBAHXZ, ?width@ios_base@std@@QEBA_JXZ, ?width@ios_base@std@@QEAA_J_J@Z, ?sputc@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@QEAAG_W@Z, ?sputn@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@QEAA_JPEB_W_J@Z, ?setstate@?$basic_ios@_WU?$char_traits@_W@std@@@std@@QEAAXH_N@Z, ?tie@?$basic_ios@_WU?$char_traits@_W@std@@@std@@QEBAPEAV?$basic_ostream@_WU?$char_traits@_W@std@@@2@XZ, ?rdbuf@?$basic_ios@_WU?$char_traits@_W@std@@@std@@QEBAPEAV?$basic_streambuf@_WU?$char_traits@_W@std@@@2@XZ, ?fill@?$basic_ios@_WU?$char_traits@_W@std@@@std@@QEBA_WXZ, ?_Osfx@?$basic_ostream@_WU?$char_traits@_W@std@@@std@@QEAAXXZ, ?flush@?$basic_ostream@_WU?$char_traits@_W@std@@@std@@QEAAAEAV12@XZ, ?widen@?$basic_ios@_WU?$char_traits@_W@std@@@std@@QEBA_WD@Z, ??6?$basic_ostream@_WU?$char_traits@_W@std@@@std@@QEAAAEAV01@P6AAEAV01@AEAV01@@Z@Z, ?put@?$basic_ostream@_WU?$char_traits@_W@std@@@std@@QEAAAEAV12@_W@Z, ?_Xout_of_range@std@@YAXPEBD@Z, ??0?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@IEAA@XZ, ??1?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@UEAA@XZ, ?gptr@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@IEBAPEA_WXZ, ??1?$basic_ios@_WU?$char_traits@_W@std@@@std@@UEAA@XZ, ??0?$basic_ios@_WU?$char_traits@_W@std@@@std@@IEAA@XZ, ??0?$basic_ostream@_WU?$char_traits@_W@std@@@std@@QEAA@PEAV?$basic_streambuf@_WU?$char_traits@_W@std@@@1@_N@Z, ??1?$basic_ostream@_WU?$char_traits@_W@std@@@std@@UEAA@XZ, ?imbue@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@MEAAXAEBVlocale@2@@Z, ?sync@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@MEAAHXZ, ?setbuf@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@MEAAPEAV12@PEA_W_J@Z, ?xsputn@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@MEAA_JPEB_W_J@Z, ?xsgetn@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@MEAA_JPEA_W_J@Z, ?uflow@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@MEAAGXZ, ?showmanyc@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@MEAA_JXZ, ?pbackfail@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@MEAAGG@Z, ?_Unlock@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@UEAAXXZ, ?_Lock@?$basic_streambuf@_WU?$char_traits@_W@std@@@std@@UEAAXXZ, ??0_Lockit@std@@QEAA@H@Z, ??1_Lockit@std@@QEAA@XZ, ?_Getgloballocale@locale@std@@CAPEAV_Locimp@12@XZ, ?always_noconv@codecvt_base@std@@QEBA_NXZ, ?in@?$codecvt@DDU_Mbstatet@@@std@@QEBAHAEAU_Mbstatet@@PEBD1AEAPEBDPEAD3AEAPEAD@Z, ?out@?$codecvt@DDU_Mbstatet@@@std@@QEBAHAEAU_Mbstatet@@PEBD1AEAPEBDPEAD3AEAPEAD@Z, ?unshift@?$codecvt@DDU_Mbstatet@@@std@@QEBAHAEAU_Mbstatet@@PEAD1AEAPEAD@Z, ?_Getcat@?$codecvt@DDU_Mbstatet@@@std@@SA_KPEAPEBVfacet@locale@2@PEBV42@@Z, ??0?$basic_streambuf@DU?$char_traits@D@std@@@std@@IEAA@XZ, ??1?$basic_streambuf@DU?$char_traits@D@std@@@std@@UEAA@XZ, ?pubseekoff@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QEAA?AV?$fpos@U_Mbstatet@@@2@_JHH@Z, ?pubseekpos@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QEAA?AV?$fpos@U_Mbstatet@@@2@V32@H@Z, ?getloc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QEBA?AVlocale@2@XZ, ?pubsync@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QEAAHXZ, ?sbumpc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QEAAHXZ, ?sgetn@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QEAA_JPEAD_J@Z, ?sputc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QEAAHD@Z, ?sputn@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QEAA_JPEBD_J@Z, ?eback@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IEBAPEADXZ, ?gptr@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IEBAPEADXZ, ?pptr@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IEBAPEADXZ, ?egptr@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IEBAPEADXZ, ?gbump@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IEAAXH@Z, ?setg@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IEAAXPEAD00@Z, _Unlock_shared_ptr_spin_lock, _Lock_shared_ptr_spin_lock, ?_Rethrow_future_exception@std@@YAXVexception_ptr@1@@Z
+VCRUNTIME140.dll: memcpy, memmove, __std_type_info_hash, _purecall, __std_exception_copy, memset, __RTDynamicCast, __std_exception_destroy, _CxxThrowException, __std_type_info_destroy_list, __current_exception_context, __current_exception, strrchr, strchr, strstr, __CxxFrameHandler3, wcsstr, __C_specific_handler, wcsrchr, memchr, __std_type_info_compare, __std_type_info_name, __RTtypeid, wcschr, __std_terminate, memcmp
+VCRUNTIME140_1.dll: __CxxFrameHandler4
+api-ms-win-crt-runtime-l1-1-0.dll: _configure_narrow_argv, _exit, _crt_atexit, _errno, _cexit, _initterm, _seh_filter_dll, terminate, raise, signal, _initterm_e, _initialize_narrow_environment, _resetstkoflw, _initialize_onexit_table, _invalid_parameter_noinfo_noreturn, _beginthreadex, _execute_onexit_table, _invalid_parameter_noinfo, _register_onexit_function
+api-ms-win-crt-heap-l1-1-0.dll: calloc, _aligned_free, free, _callnewh, _aligned_malloc, realloc, _recalloc, malloc
+api-ms-win-crt-convert-l1-1-0.dll: strtoul, _ltow, _itow, wcstoul, _wtoi, strtol, mbstowcs, wcstombs, atoi, _ltow_s, _wtol
+api-ms-win-crt-string-l1-1-0.dll: wcstok_s, towlower, strncmp, isdigit, tolower, strcpy_s, strcat_s, towupper, wcsncmp, iswprint, wcsncpy, iswctype, strnlen, wcsncat_s, iswpunct, strspn, strcspn, isxdigit, isspace, iswalpha, wcscat_s, wcscpy_s, strcmp, strncpy_s, strncpy, wcsspn, iswxdigit, iswspace, wcsncpy_s
+api-ms-win-crt-stdio-l1-1-0.dll: _fseeki64, fwrite, setvbuf, ungetc, feof, clearerr, fread, fputc, fgetpos, fsetpos, fgetc, fflush, fclose, _wfopen, fseek, ftell, _ftelli64, _get_stream_buffer_pointers, fputs, _setmode, _get_osfhandle, _fileno, fgets, ferror, __stdio_common_vfprintf, __stdio_common_vsprintf, __stdio_common_vsprintf_s, __stdio_common_vswscanf, __stdio_common_vsnwprintf_s, __stdio_common_vfwprintf, __acrt_iob_func, __stdio_common_vsnprintf_s, __stdio_common_vswprintf, __stdio_common_vswprintf_s, putwchar, fopen
+api-ms-win-crt-math-l1-1-0.dll: expf, cbrt, sqrtf, _dclass, ceilf, logf, modf, pow, frexp, ldexp, atan, _copysign, ceil, floor, log, exp, _isnan, fmod, asin, cos, sin, acos, sqrt, atan2, log10, tan
+api-ms-win-crt-filesystem-l1-1-0.dll: _lock_file, _unlock_file, _stat64i32
+api-ms-win-crt-locale-l1-1-0.dll: localeconv, setlocale
+api-ms-win-crt-time-l1-1-0.dll: _gmtime64, _gmtime64_s, _time64, _localtime64_s, _localtime64, _mkgmtime64, _mktime64, _get_timezone
+api-ms-win-crt-utility-l1-1-0.dll: srand, qsort, rand
+api-ms-win-crt-environment-l1-1-0.dll: _wgetenv_s, _wgetenv, getenv
+imagehlp.dll: TouchFileTimes
+WS2_32.dll: #56, #115, #55, #112, #16, #19, #1, #10, #6, #21, #15, #23, #22, #5, #17, #51, #3, #20, #116, #111, #57, getaddrinfo, #8, #9, #11, #4, #7, freeaddrinfo, #18, #52, #12, #151
+VERSION.dll: GetFileVersionInfoW, VerQueryValueW, GetFileVersionInfoSizeW
+WINHTTP.dll: WinHttpOpen, WinHttpCloseHandle, WinHttpGetProxyForUrl, WinHttpGetIEProxyConfigForCurrentUser, WinHttpGetDefaultProxyConfiguration
+CRYPT32.dll: CertOpenStore, CertCloseStore, CertEnumCertificatesInStore, CertFindCertificateInStore, CertDuplicateCertificateContext, CertFreeCertificateContext, CertGetCertificateContextProperty, CertOpenSystemStoreW, CryptMsgClose, CryptMsgGetParam, CertGetNameStringW, CryptQueryObject
+WINTRUST.dll: WinVerifyTrust
+SHELL32.dll: SHGetPathFromIDListW, SHGetSpecialFolderLocation, ShellExecuteExW
+KERNEL32.dll: AcquireSRWLockExclusive, AreFileApisANSI, CloseHandle, CompareStringEx, CompareStringW, CreateEventW, CreateFileW, CreateThread, CreateToolhelp32Snapshot, DecodePointer, DeleteCriticalSection, EncodePointer, EnterCriticalSection, EnumSystemLocalesW, ExitProcess, ExitThread, FileTimeToSystemTime, FindClose, FindFirstFileExW, FindNextFileW, FlushFileBuffers, FormatMessageA, FreeEnvironmentStringsW, FreeLibrary, FreeLibraryAndExitThread, GetACP, GetCPInfo, GetCommandLineA, GetCommandLineW, GetConsoleCP, GetConsoleMode, GetCurrentDirectoryW, GetCurrentProcess, GetCurrentThreadId, GetDateFormatW, GetDriveTypeW, GetEnvironmentStringsW, GetExitCodeThread, GetFileInformationByHandle, GetFileSizeEx, GetFileType, GetFullPathNameW, GetLastError, GetLocaleInfoEx, GetLocaleInfoW, GetModuleFileNameW, GetModuleHandleA, GetModuleHandleExA, GetModuleHandleExW, GetModuleHandleW, GetOEMCP, GetProcAddress, GetProcessHeap, GetStartupInfoW, GetStdHandle, GetStringTypeW, GetSystemTimeAsFileTime, GetTimeFormatW, GetTimeZoneInformation, GetUserDefaultLCID, HeapAlloc, HeapCreate, HeapFree, HeapReAlloc
+USER32.dll: CharUpperBuffA, wsprintfA
+PSAPI.DLL: GetModuleFileNameExA
+POWRPROF.dll: PowerReadFriendlyName
+ADVAPI32.dll: ConvertSidToStringSidA, ConvertStringSecurityDescriptorToSecurityDescriptorA
+ntdll.dll: RtlAddVectoredExceptionHandler, RtlCaptureContext, RtlLookupFunctionEntry, RtlPcToFileHeader, RtlRemoveVectoredExceptionHandler, RtlUnwind, RtlUnwindEx, RtlVirtualUnwind
+VERSION.dll: GetFileVersionInfoA, GetFileVersionInfoSizeA, VerQueryValueA
+WS2_32.dll: #116, #115, #151, #2, #3, #4, #51, #52, #57, #5, #9, #11, #12, #16, #17, #18, #19, #20, #21, #23
+SHELL32.dll: SHGetSpecialFolderLocation
+ole32.dll: CoTaskMemFree
+CRYPT32.dll: CertCloseStore, CertFindCertificateInStore, CertFreeCertificateContext, CertGetNameStringA, CertGetNameStringW, CryptMsgClose, CryptMsgGetParam, CryptQueryObject
+IPHLPAPI.DLL: GetIpAddrTable
+WINTRUST.dll: WinVerifyTrust

@@ -14,3 +14,15 @@ obj/
 # OS
 .DS_Store
 Thumbs.db
+
+# ---------------------------------------------------------------------------
+# docs/evidence/raw -- 大体积、可由 tools/cognex-meta 重新生成的原始 dump
+#
+# 只把"结论性文档"和小体积原始证据（约 100 KB）纳入仓库；下面四个文件
+# 合计约 2.3 MB，全部由工具一条命令重新导出，入库只会让克隆/diff 成本失控。
+# 重新生成命令见 docs/evidence/README.md「复现步骤」；文件本身留在工作区，不删除。
+# ---------------------------------------------------------------------------
+/docs/evidence/raw/pmalign-meta.json
+/docs/evidence/raw/pmalign-params.generated.md
+/docs/evidence/raw/native-strings-all.txt
+/docs/evidence/raw/native-strings-keywords.md

@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone read-only metadata forensics tool for Cognex VisionPro managed assemblies.
+    Deliberately NOT part of PatMaxSharp.csproj's compile: the repo root project uses the
+    SDK default glob (**/*.cs), so every source file in this folder is wrapped in
+    `#if COGNEX_META` and contributes zero code when the root project compiles it.
+    This project defines COGNEX_META and opts out of the default glob so only src\**\*.cs
+    is compiled here.
+
+    Usage (see README.md in this folder for the exact command lines):
+      stats   &lt;assembly.dll&gt;
+      meta    &lt;assembly.dll&gt; &lt;out.json&gt; [doc.xml]
+      md      &lt;out.json&gt; &lt;out.md&gt;
+      paramtable &lt;out.json&gt; &lt;out.md&gt;
+      strings &lt;native.dll&gt; &lt;outdir&gt;
+      doubles &lt;native.dll&gt; &lt;outdir&gt;
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>cognex-meta</AssemblyName>
+    <RootNamespace>CognexMeta</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>$(DefineConstants);COGNEX_META</DefineConstants>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+</Project>
