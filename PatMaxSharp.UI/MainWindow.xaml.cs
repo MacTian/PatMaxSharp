@@ -15,6 +15,11 @@ public partial class MainWindow : Window
         _vm = new MainViewModel();
         DataContext = _vm;
 
+        // Allow `PatMaxSharp.UI.exe <image>` to start with an image already loaded.
+        var args = System.Environment.GetCommandLineArgs();
+        if (args.Length > 1 && System.IO.File.Exists(args[1]))
+            _vm.LoadImageFile(args[1]);
+
         rbTrain.Checked += (_, _) => viewer.SelectMode = RegionKind.Train;
         rbSearch.Checked += (_, _) => viewer.SelectMode = RegionKind.Search;
 

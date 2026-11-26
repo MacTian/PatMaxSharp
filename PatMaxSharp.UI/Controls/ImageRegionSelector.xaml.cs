@@ -82,17 +82,30 @@ public partial class ImageRegionSelector : UserControl
     }
 
     /// <summary>
-    /// Pattern outline: featurelet positions relative to the pattern origin.
-    /// Drawn at each matched marker to visualise the matched model contour.
+    /// Pattern outline entries: feature position relative to the pattern origin plus its
+    /// unit edge normal, so the overlay can be drawn as oriented ticks at the matched pose.
+    /// A bare point list cannot be rotated meaningfully — the old overlay simply added the
+    /// model offset to the match position, which is why rotated matches drew wrong.
     /// </summary>
     public static readonly DependencyProperty PatternOutlineProperty =
-        DependencyProperty.Register(nameof(PatternOutline), typeof(List<Point>), typeof(ImageRegionSelector),
+        DependencyProperty.Register(nameof(PatternOutline), typeof(List<OutlineFeature>), typeof(ImageRegionSelector),
             new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
 
-    public List<Point> PatternOutline
+    public List<OutlineFeature> PatternOutline
     {
-        get => (List<Point>)GetValue(PatternOutlineProperty);
+        get => (List<OutlineFeature>)GetValue(PatternOutlineProperty);
         set => SetValue(PatternOutlineProperty, value);
+    }
+
+    /// <summary>Whether the green training rectangle is shown (hidden again after a run).</summary>
+    public static readonly DependencyProperty ShowTrainRegionProperty =
+        DependencyProperty.Register(nameof(ShowTrainRegion), typeof(bool), typeof(ImageRegionSelector),
+            new PropertyMetadata(true, (d, e) => ((ImageRegionSelector)d).RedrawRegions()));
+
+    public bool ShowTrainRegion
+    {
+        get => (bool)GetValue(ShowTrainRegionProperty);
+        set => SetValue(ShowTrainRegionProperty, value);
     }
 
     public static readonly DependencyProperty SelectModeProperty =
@@ -267,7 +280,7 @@ public partial class ImageRegionSelector : UserControl
     {
         if (_trainRect == null) return;
 
-        if (TrainRegion is Rect tr)
+        if (TrainRegion is Rect tr && ShowTrainRegion)
         {
             _trainRect.Visibility = Visibility.Visible;
             _trainRect.Width = tr.Width * Zoom; _trainRect.Height = tr.Height * Zoom;
@@ -309,27 +322,46 @@ public partial class ImageRegionSelector : UserControl
                 Width = s * 2, Height = s * 2,
                 Stroke = brush, StrokeThickness = thickness,
                 StrokeDashArray = new DoubleCollection { 3, 2 },
-                Fill = Brushes.Transparent
+                Fill = Brushes.Transparent,
+                RenderTransformOrigin = new Point(0.5, 0.5),
+                RenderTransform = new RotateTransform(m.AngleDeg)
             };
             Canvas.SetLeft(box, pos.X - s);
             Canvas.SetTop(box, pos.Y - s);
 
-            // matched model outline (featurelet positions relative to the origin)
-            if (PatternOutline != null && PatternOutline.Count > 1)
+            // Matched model overlay: each feature drawn as a tick along its own edge normal,
+            // rotated and scaled by the found pose. One Path for the whole model keeps the
+            // element count at one per match instead of one per feature.
+            if (PatternOutline != null && PatternOutline.Count > 0)
             {
                 var outlineBrush = selected ? Brushes.Yellow : Brushes.Cyan;
-                for (int oi = 0; oi < PatternOutline.Count - 1; oi++)
+                double ca = Math.Cos(a), sa = Math.Sin(a);
+                const double tickHalf = 1.6;   // model-space half length of a tick
+
+                var geo = new StreamGeometry();
+                using (var ctx = geo.Open())
                 {
-                    var q1 = new Point((m.X + PatternOutline[oi].X) * Zoom, (m.Y + PatternOutline[oi].Y) * Zoom);
-                    var q2 = new Point((m.X + PatternOutline[oi + 1].X) * Zoom, (m.Y + PatternOutline[oi + 1].Y) * Zoom);
-                    var seg = new Line
+                    foreach (var f in PatternOutline)
                     {
-                        X1 = q1.X, Y1 = q1.Y, X2 = q2.X, Y2 = q2.Y,
-                        Stroke = outlineBrush, StrokeThickness = Math.Max(1.0, thickness * 0.6)
-                    };
-                    seg.Tag = new MatchMarkerTag();
-                    _canvas.Children.Add(seg);
+                        double px = m.X + m.Scale * (ca * f.X - sa * f.Y);
+                        double py = m.Y + m.Scale * (sa * f.X + ca * f.Y);
+                        double nx = m.Scale * (ca * f.Nx - sa * f.Ny) * tickHalf;
+                        double ny = m.Scale * (sa * f.Nx + ca * f.Ny) * tickHalf;
+
+                        ctx.BeginFigure(new Point((px - nx) * Zoom, (py - ny) * Zoom), false, false);
+                        ctx.LineTo(new Point((px + nx) * Zoom, (py + ny) * Zoom), true, false);
+                    }
                 }
+                geo.Freeze();
+
+                var overlay = new System.Windows.Shapes.Path
+                {
+                    Data = geo,
+                    Stroke = outlineBrush,
+                    StrokeThickness = Math.Max(1.0, thickness * 0.55),
+                    Tag = new MatchMarkerTag()
+                };
+                _canvas.Children.Add(overlay);
             }
 
             foreach (var el in new FrameworkElement[] { box, crossH, crossV, arrow })
@@ -354,6 +386,18 @@ public sealed class MatchMarker
     public double Score { get; set; }
     public bool Accepted { get; set; }
     public double Size { get; set; } = 24;
+}
+
+/// <summary>
+/// One entry of the model overlay: position relative to the pattern origin and the unit
+/// edge normal at that position.
+/// </summary>
+public sealed class OutlineFeature
+{
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Nx { get; set; }
+    public double Ny { get; set; }
 }
 
 public enum RegionKind { Train, Search }

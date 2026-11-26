@@ -204,6 +204,7 @@
                         SearchRegion="{Binding SearchRegion, Mode=TwoWay}"
                         Markers="{Binding Markers}"
                         PatternOutline="{Binding PatternOutline}"
+                        ShowTrainRegion="{Binding ShowTrainRegion}"
                         ImageWidth="{Binding ImagePixelWidth}"
                         ImageHeight="{Binding ImagePixelHeight}"/>
                 </Border>
@@ -216,13 +217,41 @@
                               RowBackground="#252526" AlternatingRowBackground="#2D2D30"
                               GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                               BorderThickness="0">
+                        <DataGrid.Resources>
+                            <!-- The default column header renders with the system theme's white
+                                 background, which left white header text unreadable on the dark
+                                 grid. Style it to match the rest of the window. -->
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="#2D2D30"/>
+                                <Setter Property="Foreground" Value="#DDDDDD"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="Padding" Value="6,5"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                <Setter Property="BorderBrush" Value="#3F3F46"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="DataGridColumnHeader">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter VerticalAlignment="Center"
+                                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </DataGrid.Resources>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="#" Binding="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=Header}" Width="40"/>
                             <DataGridTextColumn Header="得分 Score" Binding="{Binding Score, StringFormat=F3}" Width="90"/>
                             <DataGridTextColumn Header="相似度 Coverage" Binding="{Binding Coverage, StringFormat=P0}" Width="100"/>
                             <DataGridTextColumn Header="X" Binding="{Binding X, StringFormat=F1}" Width="70"/>
                             <DataGridTextColumn Header="Y" Binding="{Binding Y, StringFormat=F1}" Width="70"/>
-                            <DataGridTextColumn Header="角度 Angle" Binding="{Binding Angle, StringFormat=F2}" Width="90"/>
+                            <DataGridTextColumn Header="角度 Angle(°)" Binding="{Binding AngleDegrees, StringFormat=F2}" Width="90"/>
                             <DataGridTextColumn Header="缩放 Scale" Binding="{Binding Scale, StringFormat=F3}" Width="90"/>
                             <DataGridTextColumn Header="匹配特征" Binding="{Binding MatchedFeatures}" Width="90"/>
                             <DataGridTextColumn Header="杂波特征" Binding="{Binding BadFeatures}" Width="90"/>

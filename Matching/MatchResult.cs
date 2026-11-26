@@ -47,6 +47,9 @@ public sealed class MatchResult
     /// <summary>Rotation in radians.</summary>
     public double Angle { get; set; }
 
+    /// <summary>Rotation in degrees — what the UI and reports should display.</summary>
+    public double AngleDegrees => Angle * 180.0 / Math.PI;
+
     /// <summary>Uniform scale.</summary>
     public double Scale { get; set; } = 1.0;
 

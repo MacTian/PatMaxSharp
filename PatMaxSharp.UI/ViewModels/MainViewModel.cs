@@ -167,7 +167,31 @@ public sealed class MainViewModel : INotifyPropertyChanged
     #region Properties
     public ImageSource Image { get => _image; private set => Set(ref _image, (BitmapSource)value); }
     public string Status { get => _status; private set => Set(ref _status, value); }
-    public Rect? TrainRegion { get => _trainRegion; set { if (Set(ref _trainRegion, value)) OnPropertyChanged(nameof(CanTrain)); } }
+    public Rect? TrainRegion
+    {
+        get => _trainRegion;
+        set
+        {
+            if (Set(ref _trainRegion, value))
+            {
+                OnPropertyChanged(nameof(CanTrain));
+                // drawing a new region brings the green overlay back
+                if (value.HasValue) ShowTrainRegion = true;
+            }
+        }
+    }
+
+    private bool _showTrainRegion = true;
+
+    /// <summary>
+    /// Whether the green training rectangle is drawn. Turned off after a run so the overlay
+    /// does not sit on top of the match result, turned back on when a region is (re)drawn.
+    /// </summary>
+    public bool ShowTrainRegion
+    {
+        get => _showTrainRegion;
+        private set => Set(ref _showTrainRegion, value);
+    }
     public Rect? SearchRegion { get => _searchRegion; set => Set(ref _searchRegion, value); }
     public bool Trained { get => _trained; private set => Set(ref _trained, value); }
     public bool CanTrain => _image != null && TrainRegion.HasValue;
@@ -311,8 +335,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Markers drawn on the image (position + angle + score).</summary>
     public List<MatchMarker> Markers { get; private set; } = new();
 
-    /// <summary>Model outline (featurelet positions relative to the pattern origin).</summary>
-    public List<Point> PatternOutline { get; private set; } = new();
+    /// <summary>
+    /// Model overlay: feature position relative to the pattern origin plus its unit edge
+    /// normal, so the viewer can rotate and scale it onto each matched pose.
+    /// </summary>
+    public List<OutlineFeature> PatternOutline { get; private set; } = new();
 
     /// <summary>Last run processing time (ms).</summary>
     public double ProcessingTimeMs { get; private set; }
@@ -332,19 +359,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Filter = "图片文件|*.bmp;*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.gif|BMP|*.bmp|PNG|*.png|JPEG|*.jpg;*.jpeg|TIFF|*.tif;*.tiff|所有文件|*.*"
         };
         if (dlg.ShowDialog() != true) return;
+        LoadImageFile(dlg.FileName);
+    }
 
+    /// <summary>Load an image by path. Also used for a path given on the command line.</summary>
+    public void LoadImageFile(string path)
+    {
         try
         {
             var bmp = new BitmapImage();
             bmp.BeginInit();
             bmp.CacheOption = BitmapCacheOption.OnLoad;
-            bmp.UriSource = new Uri(dlg.FileName);
+            bmp.UriSource = new Uri(path);
             bmp.EndInit();
             bmp.Freeze();
             Image = bmp;
             ImagePixelWidth = bmp.PixelWidth;
             ImagePixelHeight = bmp.PixelHeight;
-            Status = $"已加载: {System.IO.Path.GetFileName(dlg.FileName)} ({bmp.PixelWidth}×{bmp.PixelHeight})";
+            Status = $"已加载: {System.IO.Path.GetFileName(path)} ({bmp.PixelWidth}×{bmp.PixelHeight})";
             // Keep the trained model and parameters so the user can run directly
             // on the new image. Results from the previous image are cleared.
             Results.Clear();
@@ -370,6 +402,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _tool.EdgeDetector.UseSimd = UseSimd;
             _tool.EdgeDetector.UseParallel = UseParallel;
             var pattern = _tool.Train(crop, originX, originY, Grain);
+
+            // A region over plain background yields no features. Say so instead of leaving a
+            // model that later fails with the bare "pattern not trained" from the engine.
+            if (pattern.FeatureCount < 8)
+            {
+                Trained = false;
+                Status = $"训练失败: 框内只有 {pattern.FeatureCount} 个边缘特征 —— 请把训练框拖到目标上" +
+                         $"（当前区域 {r.X:F0},{r.Y:F0} 尺寸 {r.Width:F0}×{r.Height:F0}）";
+                Results.Clear();
+                return;
+            }
+
             Trained = true;
             Status = $"训练完成: {pattern.FeatureCount} 特征, W={pattern.W:F2}, grain={Grain}";
             Results.Clear();
@@ -421,14 +465,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
             Markers = markers;
 
-            // model outline: featurelet positions relative to the pattern origin
+            // Model overlay: position relative to the origin plus the edge normal, so the
+            // viewer can rotate/scale it onto the found pose (a bare point list could not be).
             if (_tool.Pattern != null)
             {
                 PatternOutline = _tool.Pattern.Featurelets
-                    .Select(f => new Point(f.X - _tool.Pattern.OriginX, f.Y - _tool.Pattern.OriginY))
+                    .Select(f => new OutlineFeature
+                    {
+                        X = f.X - _tool.Pattern.OriginX,
+                        Y = f.Y - _tool.Pattern.OriginY,
+                        Nx = f.Nx,
+                        Ny = f.Ny
+                    })
                     .ToList();
                 OnPropertyChanged(nameof(PatternOutline));
             }
+
+            // the green training rectangle has done its job once the match is on screen
+            ShowTrainRegion = false;
             ProcessingTimeMs = sw.Elapsed.TotalMilliseconds;
             ThroughputMpxs = (gray.Width * gray.Height / 1_000_000.0) / (sw.Elapsed.TotalSeconds > 0 ? sw.Elapsed.TotalSeconds : 1e-9);
 
@@ -440,7 +494,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            Status = $"运行失败: {ex.Message}";
+            Status = $"运行失败: {ex.Message}（先把训练框拖到目标上并点“训练模型”）";
         }
     }
 
@@ -483,6 +537,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
             CalibrationReport = sb.ToString();
             OnPropertyChanged(nameof(CalibrationReport));
             Status = "标定测试完成";
+
+            // The report has no bound panel, so show it — otherwise the button looks inert.
+            MessageBox.Show(sb.ToString(), "标定测试结果",
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) { Status = "标定测试失败: " + ex.Message; }
     }
