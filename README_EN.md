@@ -86,7 +86,7 @@ The decisive point: the correspondences in step 5 come from **measured edge posi
 |---|---|---|
 | `Score` | PatMax-style score, `coverage^(1/N)` weighted | 0–1 |
 | `Coverage` | Fraction of the model's features that were matched | 0–1 |
-| `Clutter` | Fraction of the model footprint that is edge energy the model does not explain | 0 = clean, 1 = fully cluttered |
+| `Clutter` | Proxy for the fraction of features whose edge was not found (`0.5 x unmatched/total`), used to pull down scores the image does not support; not the same quantity as the original clutter, see the `MatchResult.Clutter` comment | 0 = clean, 1 = fully cluttered |
 | `FitError` | RMS residual of the pose fit | pixels |
 
 Acceptance rule: `Accepted ⟺ Score ≥ AcceptThreshold`. A half-occluded part scores around 0.7 instead of collapsing to 0, which is exactly what the `1/N` exponent denominator buys (measured: 22% occlusion → score 0.831).
@@ -161,7 +161,7 @@ Command: `dotnet run -c Release -- --cal <directory>`.
 |---|---|---|
 | `AcceptThreshold` | 0.5 | Minimum `Score` for a result to be accepted |
 | `CoarseAcceptThreshold` | 0.33 | Coarse-stage prefilter gate; below it a hypothesis is not refined |
-| `ContrastThreshold` | 0.08 | Normalised contrast gate (relative to the training baseline, 0–1) |
+| `ContrastThreshold` | 0.08 | Normalised contrast gate: response relative to the 80th percentile of that level's edge magnitudes; weaker responses do not match |
 | `ScoreExponentN` | 2.0 | Score exponent denominator: `score = coverage^(1/N)` |
 | `RotationAngleMin` / `RotationAngleMax` | −180 / +180 | Angular search range (degrees) |
 | `ScaleMin` / `ScaleMax` | 1.0 / 1.0 | Scale search range (equal values = no scale search) |
@@ -188,7 +188,7 @@ The original defaults were read from the ECMA-335 metadata and `[DefaultValue]` 
 |---|---|---|
 | `AcceptThreshold` 0.5 | `AcceptThreshold` 0.5 | Identical |
 | `CoarseAcceptThreshold` 0.33 | `CoarseAcceptThreshold` 0.33 | Identical |
-| `ContrastThreshold` 0.08 | `ContrastThreshold` 10 (0–65535 units) | Normalised here to 0–1 relative to the training baseline |
+| `ContrastThreshold` 0.08 | `ContrastThreshold` 10 (0–65535 units) | Normalised here to a 0–1 ratio against the level magnitude reference |
 | `NoiseFloor` 8.0 | `EdgeThreshold` 10.0 training / 5.0 runtime | Training and runtime thresholds collapsed into one noise floor |
 | `MaxLevels` + `Grain` | `GrainLimitFine` 1 / `GrainLimitCoarse` 4 | Pyramid level count + grain, the equivalent expression |
 | `UseClutter` true | `ScoreUsingClutter` true | Identical |

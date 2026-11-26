@@ -86,7 +86,7 @@
 |---|---|---|
 | `Score` | PatMax 风格得分，`coverage^(1/N)` 加权 | 0–1 |
 | `Coverage` | 命中特征占全模型的比例 | 0–1 |
-| `Clutter` | 模型覆盖范围内未被模型解释的边缘能量比例 | 0 = 干净，1 = 全干扰 |
+| `Clutter` | 未找到边缘的特征比例代理量（`0.5 × 未匹配/总数`），用于把未被模型解释的影像压低分数；与原版 clutter 的定义不同，见 `MatchResult.Clutter` 注释 | 0 = 干净，1 = 全干扰 |
 | `FitError` | 位姿拟合的 RMS 残差 | 像素 |
 
 接受判据：`Accepted ⟺ Score ≥ AcceptThreshold`。半遮挡件得分约 0.7 而不是坍塌到 0，正是 `coverage^(1/N)` 这个指数分母的作用（实测：遮挡 22% → score 0.831）。
@@ -161,7 +161,7 @@
 |---|---|---|
 | `AcceptThreshold` | 0.5 | 输出为接受结果的最低 `Score` |
 | `CoarseAcceptThreshold` | 0.33 | 粗层预筛门限，低于此值不再进入细化 |
-| `ContrastThreshold` | 0.08 | 归一化对比度门限（相对训练基准 0–1） |
+| `ContrastThreshold` | 0.08 | 归一化对比度门限：与该层边缘幅值的 80 分位之比，低于它的响应不算命中 |
 | `ScoreExponentN` | 2.0 | 评分指数分母：`score = coverage^(1/N)` |
 | `RotationAngleMin` / `RotationAngleMax` | −180 / +180 | 角度搜索区间（度） |
 | `ScaleMin` / `ScaleMax` | 1.0 / 1.0 | 尺度搜索区间（相等 = 不做尺度搜索） |
@@ -188,7 +188,7 @@
 |---|---|---|
 | `AcceptThreshold` 0.5 | `AcceptThreshold` 0.5 | 一致 |
 | `CoarseAcceptThreshold` 0.33 | `CoarseAcceptThreshold` 0.33 | 一致 |
-| `ContrastThreshold` 0.08 | `ContrastThreshold` 10（0–65535 单位） | 本实现归一化为相对训练基准的 0–1 |
+| `ContrastThreshold` 0.08 | `ContrastThreshold` 10（0–65535 单位） | 本实现改为按该层幅值基准归一化的 0–1 比值 |
 | `NoiseFloor` 8.0 | `EdgeThreshold` 训练 10.0 / 运行 5.0 | 训练/运行门限合并为单一噪声门限 |
 | `MaxLevels` + `Grain` | `GrainLimitFine` 1 / `GrainLimitCoarse` 4 | 金字塔层数 + grain 参数的等价表达 |
 | `UseClutter` true | `ScoreUsingClutter` true | 一致 |
