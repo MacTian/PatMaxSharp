@@ -5,9 +5,12 @@ namespace PatMaxSharp.Projection;
 
 /// <summary>
 /// 1D projection of an edge map along a search direction.
-/// Parameter names from reverse engineering:
-///   Projection Region Center / Projection Length / Rotation Angle /
-///   Search Length / Skew Angle / Scan Mode Enabled.
+///
+/// The parameter names follow the public PMAlign projection surface
+/// (Projection Region Center / Projection Length / Rotation Angle / Search Length /
+/// Skew Angle / Scan Mode Enabled). Early notes called them "reverse engineered"; they are in
+/// fact public API documentation, not recovered machine code. Only the centre, the two lengths
+/// and the angle are implemented here - Skew Angle and Scan Mode are listed for reference only.
 /// </summary>
 public sealed class ProjectionMethod
 {
@@ -15,7 +18,7 @@ public sealed class ProjectionMethod
     /// Project the edge magnitude along direction <paramref name="angleRad"/> (radians),
     /// over a region centered at (cx, cy) with the given extent.
     /// </summary>
-    public double[] Project(GaborEdgeDetector.EdgeMap edges, double cx, double cy,
+    public double[] Project(EdgeMap edges, double cx, double cy,
                             double angleRad, int projectionLength, int searchLength)
     {
         double dx = Math.Cos(angleRad), dy = Math.Sin(angleRad);          // along search

@@ -233,13 +233,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _RotationAngleMax;
         set => Set(ref _RotationAngleMax, value);
     }
-    private double _ScaleMin = 0.8;
+    private double _ScaleMin = 1.0;
     public double ScaleMin
     {
         get => _ScaleMin;
         set => Set(ref _ScaleMin, value);
     }
-    private double _ScaleMax = 1.2;
+    private double _ScaleMax = 1.0;
     public double ScaleMax
     {
         get => _ScaleMax;
@@ -395,6 +395,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _tool.ContrastThreshold = ContrastThreshold;
             _tool.RotationAngleMin = RotationAngleMin;
             _tool.RotationAngleMax = RotationAngleMax;
+            _tool.ScaleMin = ScaleMin;
+            _tool.ScaleMax = ScaleMax;
+            _tool.MaxCandidates = Math.Clamp(Math.Max(8, MaxResults * 2), 8, 32);
+            _tool.UseClutter = ScoreUsingClutter;
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var results = _tool.Run(gray, MaxResults);

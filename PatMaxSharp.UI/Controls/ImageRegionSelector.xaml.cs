@@ -121,7 +121,7 @@ public partial class ImageRegionSelector : UserControl
     public double Zoom { get => (double)GetValue(ZoomProperty); set => SetValue(ZoomProperty, value); }
     #endregion
 
-    public event Action<Rect?>? RegionChanged;
+    public event Action<Rect?> RegionChanged;
 
     private void OnSourceChanged()
     {

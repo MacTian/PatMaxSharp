@@ -3,24 +3,38 @@ namespace PatMaxSharp.Projection;
 /// <summary>
 /// 1D Derivative-of-Gaussian kernel — the PatMax matching kernel.
 ///
-/// Reconstructed from ccDiffOfGauss1D (RVA 0x2c8f50, reports/03-convolve.md):
+/// Kernel construction - the contract this code implements. It is an engineering
+/// reproduction of the derivative-of-Gaussian profile the PMAlign edge stage uses, not a
+/// transcription of machine code: early notes attributed it to a native function at RVA
+/// 0x2c8f50, which lies inside a WIBU-encrypted section of cogxpma.dll and cannot be
+/// reviewed statically.
+///
 ///   r = max(1, floor(4*sigma))
 ///   C = 1 / (sigma^3 * sqrt(2*pi))
 ///   k[i] = i * exp(-i^2/(2 sigma^2)) * C     for i in [-r, -1]
-///   half-axis L1 normalized (sum|k| = 1)
+///   negative half L1 normalized (sum of |k| over the negative half = 1, so the whole
+///   kernel sums to 2 - see BuildKernel)
 ///   k[r] = 0                                  (center tap)
 ///   k[r+j] = -k[r-j]                          (antisymmetric)
 ///
-///   sigma = grain * 0.25 + 0.001              (RVA 0x221620)
+///   sigma = grain * 0.25 + 0.001
 ///   grain in [1.0, 25.5]
 /// </summary>
 public sealed class DiffOfGauss1D
 {
+    /// <summary>Kernel taps, length 2 * <see cref="Radius"/> + 1, antisymmetric about the centre.</summary>
     public double[] Kernel { get; }
+
+    /// <summary>Kernel half-width in samples (max(1, floor(4 * sigma))).</summary>
     public int Radius { get; }
+
+    /// <summary>Number of taps: 2 * <see cref="Radius"/> + 1.</summary>
     public int Length => Kernel.Length;
+
+    /// <summary>Gaussian sigma the kernel was built with (grain * 0.25 + 0.001).</summary>
     public double Sigma { get; }
 
+    /// <summary>Build the kernel for one grain value (grain 1.0 gives sigma 0.251 and radius 1).</summary>
     public DiffOfGauss1D(double grain)
     {
         Sigma = grain * 0.25 + 0.001;
@@ -28,6 +42,11 @@ public sealed class DiffOfGauss1D
         Kernel = BuildKernel(Sigma, Radius);
     }
 
+    /// <summary>
+    /// Build the antisymmetric kernel for an explicit sigma and radius: the negative half is
+    /// filled from i * exp(-i^2 / (2 sigma^2)) * C and L1-normalised, the centre tap is 0 and the
+    /// positive half is its mirror image.
+    /// </summary>
     public static double[] BuildKernel(double sigma, int r)
     {
         int len = 2 * r + 1;
@@ -53,7 +72,8 @@ public sealed class DiffOfGauss1D
 
     /// <summary>
     /// Valid cross-correlation: out[p] = sum_j in[p+j] * k[j], length N-K+1.
-    /// Mirrors ccConvolve1D (RVA 0x2c9780).
+    /// Early notes claimed this mirrors a native ccConvolve1D at RVA 0x2c9780; that address is
+    /// inside the WIBU-encrypted native core, so only the arithmetic above is claimed.
     /// </summary>
     public double[] Convolve(double[] input)
     {
@@ -62,7 +82,7 @@ public sealed class DiffOfGauss1D
         int outLen = n - klen + 1;
         var output = new double[outLen];
 
-        // 4-way unrolled accumulation (mirrors the SSE2 kernel)
+        // 4-way unrolled accumulation (a scalar unroll - this is not an SSE2 port)
         for (int p = 0; p < outLen; p++)
         {
             double acc0 = 0, acc1 = 0, acc2 = 0, acc3 = 0;
@@ -83,7 +103,9 @@ public sealed class DiffOfGauss1D
 
     /// <summary>
     /// Antisymmetric-optimized variant: sum_j (in[j]-in[K-1-j])*k[j].
-    /// Mirrors ccConvolve1DOdd (RVA 0x2c9990) — half the multiplies.
+    /// Halves the multiplies by exploiting k[r+j] = -k[r-j]; the early claim that it mirrors a
+    /// native ccConvolve1DOdd at RVA 0x2c9990 — an address inside WIBU-encrypted code —
+    /// cannot be checked, so only the arithmetic identity above is claimed.
     /// </summary>
     public double[] ConvolveOdd(double[] input)
     {

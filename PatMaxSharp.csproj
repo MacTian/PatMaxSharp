@@ -10,12 +10,17 @@
     <RootNamespace>PatMaxSharp</RootNamespace>
   </PropertyGroup>
 
-  <!-- The WPF UI is a separate project; do not compile its sources here -->
+  <!-- The WPF UI is a separate project; do not compile its sources here.
+       tools/ holds standalone analyser projects with their own obj/bin output. -->
   <ItemGroup>
     <Compile Remove="PatMaxSharp.UI\**" />
     <Compile Remove="PatMaxSharp.CalTest\**" />
+    <Compile Remove="tools\**" />
+    <Compile Remove="docs\**" />
     <None Remove="PatMaxSharp.UI\**" />
     <None Remove="PatMaxSharp.CalTest\**" />
+    <None Remove="tools\**" />
+    <None Remove="docs\**" />
   </ItemGroup>
 
 </Project>

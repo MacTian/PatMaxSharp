@@ -1,759 +1,384 @@
+using System.Diagnostics;
 using PatMaxSharp.Core;
 using PatMaxSharp.Edge;
 using PatMaxSharp.Fit;
 using PatMaxSharp.Matching;
 using PatMaxSharp.Projection;
+using PatMaxSharp.Training;
 
 namespace PatMaxSharp;
 
 /// <summary>
-/// PatMax (PMAlign) implementation reconstructed from the Cognex binary.
+/// PatMax (PMAlign) work-alike: train a pattern from a region, then locate instances of it.
 ///
-/// Pipeline (confirmed by diagnostic strings, appendix B.4):
-///   Train: Gabor edge -> dipoles -> run-length chains -> featurelets -> W/N
-///   Run:   Gabor edge -> projection -> peak detect -> feature matching -> score -> pose fit
+/// Pipeline:
+///   Train: gradient field -> ridge thinning -> sparse feature set (position, edge normal,
+///          polarity, magnitude) -> W / N / contrast reference
+///   Run:   edge pyramid -> exhaustive direction-sensitive correlation at the coarsest
+///          level -> level-by-level refinement -> full-feature scoring
+///          -> edge-normal sub-pixel correspondence -> robust similarity pose fit
+///
+/// The public surface stays compatible with the earlier revision (Train/Run/Pattern and the
+/// parameter properties), because the WPF front end binds to it directly.
 /// </summary>
 public sealed class PatMaxTool
 {
+    /// <summary>Edge detector shared by training and search (owns the noise floor and the Gabor settings).</summary>
     public GaborEdgeDetector EdgeDetector { get; }
-    public ProjectionMethod Projector { get; } = new ProjectionMethod();
-    public PeakDetector PeakDetector { get; } = new PeakDetector();
-    public Scorer Scorer { get; } = new Scorer();
-    public LeastSquaresFitter Fitter { get; } = new LeastSquaresFitter();
 
+    /// <summary>Search engine used by <see cref="Run"/> and <see cref="RunMulti"/>.</summary>
+    public SearchEngine Engine { get; } = new();
+
+    /// <summary>Standalone scorer, exposed for callers that score their own hypotheses.</summary>
+    public Scorer Scorer { get; } = new();
+
+    /// <summary>Least-squares pose fitter, exposed for <see cref="FitPose"/> and direct use.</summary>
+    public LeastSquaresFitter Fitter { get; } = new();
+
+    /// <summary>Peak detector, exposed for callers that post-process their own correlation surfaces.</summary>
+    public PeakDetector PeakDetector { get; } = new();
+
+    /// <summary>1D projector, exposed for callers that need the projection of an edge field.</summary>
+    public ProjectionMethod Projector { get; } = new();
+
+    /// <summary>Most recently trained model.</summary>
     public PatternModel Pattern { get; private set; }
+
+    /// <summary>Timing/statistics of the last run.</summary>
+    public SearchDiagnostics LastDiagnostics { get; } = new();
+
+    // ---- scoring ----
+    /// <summary>Minimum score to report a result as accepted.</summary>
     public double AcceptThreshold { get; set; } = 0.5;
-    public double ContrastThreshold { get; set; } = 0.1;
 
-    /// <summary>Voting accumulator step in pixels (smaller = higher precision, slower).</summary>
-    public int PrecisionStep { get; set; } = 2;
+    /// <summary>Minimum normalised contrast of the matched edges.</summary>
+    public double ContrastThreshold { get; set; } = 0.08;
 
-    /// <summary>Enable sub-pixel refinement of the voted origin.</summary>
-    public bool SubpixelRefinement { get; set; } = true;
+    /// <summary>Exponent denominator N: score = coverage^(1/N).</summary>
+    public double ScoreExponentN { get; set; } = 2.0;
 
-    /// <summary>Cluster radius in pixels for merging nearby candidate origins.</summary>
-    public double ClusterRadius { get; set; } = 8.0;
+    /// <summary>Coarse-stage gate (CoarseAcceptThreshold, default 0.33).</summary>
+    public double CoarseAcceptThreshold { get; set; } = 0.33;
+
+    // ---- search space ----
+    /// <summary>Lower bound of the rotation search range, degrees.</summary>
     public double RotationAngleMin { get; set; } = -180;
+
+    /// <summary>Upper bound of the rotation search range, degrees.</summary>
     public double RotationAngleMax { get; set; } = 180;
 
-    /// <summary>Debug: peak of the voting accumulator (last run).</summary>
-    public (double x, double y, double votes) LastVotePeak { get; private set; }
+    /// <summary>Lower bound of the scale search range.</summary>
+    public double ScaleMin { get; set; } = 1.0;
 
-    /// <summary>Enable clustering of nearby candidates (robustness against duplicates).</summary>
+    /// <summary>Upper bound of the scale search range.</summary>
+    public double ScaleMax { get; set; } = 1.0;
+
+    // ---- performance knobs (compatibility names preserved) ----
+    /// <summary>Coarse position stride in level pixels (1 = thorough, 4 = fast).</summary>
+    public int PrecisionStep { get; set; } = 2;
+
+    /// <summary>Sub-pixel edge-normal refinement + least-squares pose fit.</summary>
+    public bool SubpixelRefinement { get; set; } = true;
+
+    /// <summary>Merge instances closer than <see cref="ClusterRadius"/>.</summary>
     public bool EnableClustering { get; set; } = true;
 
-    /// <summary>Gaussian pre-smooth sigma (noise robustness). 0 disables.</summary>
+    /// <summary>Minimum separation between two reported instances, pixels.</summary>
+    public double ClusterRadius { get; set; } = 8.0;
+
+    /// <summary>
+    /// Extra Gaussian blur applied before edge extraction. Only used when the value is above
+    /// 0.6, so the 0.5 default leaves the image untouched (edge extraction already smooths
+    /// with its derivative-of-Gaussian kernel).
+    /// </summary>
     public double PreSmoothSigma { get; set; } = 0.5;
 
+    /// <summary>Features used in the exhaustive stage.</summary>
+    public int CoarseFeatureCount { get; set; } = 32;
+
+    /// <summary>Features used in the intermediate refinement stages.</summary>
+    public int MidFeatureCount { get; set; } = 96;
+
+    /// <summary>Hypotheses carried from the coarse stage.</summary>
+    public int MaxCandidates { get; set; } = 20;
+
+    /// <summary>Angular step of the exhaustive stage, degrees.</summary>
+    public double CoarseAngleStepDeg { get; set; } = 15.0;
+
+    /// <summary>Maximum pyramid levels.</summary>
+    public int MaxLevels { get; set; } = 4;
+
+    /// <summary>Score includes unmodelled-edge clutter.</summary>
+    public bool UseClutter { get; set; } = true;
+
+    /// <summary>
+    /// Wall-clock budget for one run, milliseconds, declared for API compatibility. It is
+    /// copied into SearchOptions but the search engine does not consult it, so a run is not
+    /// cut short by this value.
+    /// </summary>
+    public double TimeoutMs { get; set; }
+
+    // ---- training ----
+    /// <summary>Upper bound on the number of features stored in a trained model.</summary>
+    public int TrainMaxFeatures { get; set; } = 600;
+
+    /// <summary>Minimum distance between two stored features, pixels.</summary>
+    public double TrainMinSpacing { get; set; } = 2.0;
+
+    /// <summary>Discard features weaker than this fraction of the strongest edge in the region.</summary>
+    public double TrainContrastThreshold { get; set; } = 0.08;
+
+    /// <summary>Ignore edge polarity when training (CogPMAlignPattern.IgnorePolarity).</summary>
+    public bool IgnorePolarity { get; set; }
+
+    /// <summary>Gradient magnitude below which nothing is considered an edge.</summary>
+    public double NoiseFloor
+    {
+        get => EdgeDetector.NoiseFloor;
+        set => EdgeDetector.NoiseFloor = value;
+    }
+
+    /// <summary>Create a tool with a default <see cref="GaborEdgeDetector"/>.</summary>
     public PatMaxTool()
     {
         EdgeDetector = new GaborEdgeDetector();
     }
 
-    // ------------------------------------------------------------------
-    //  Dipole extraction
-    // ------------------------------------------------------------------
-    /// <summary>
-    /// Convert an edge map to dipoles.
-    ///   x = ix + 0.5 + scale*cos(theta)
-    ///   y = iy + 0.5 + scale*sin(theta)      (pixel-center convention)
-    /// </summary>
-    public List<Dipole> ExtractDipoles(GaborEdgeDetector.EdgeMap edges, double scale = 0.5)
+    /// <summary>Create a tool that shares an existing edge detector (its settings are then live).</summary>
+    public PatMaxTool(GaborEdgeDetector detector)
     {
-        var dipoles = new List<Dipole>();
-        for (int y = 0; y < edges.Height; y++)
-        {
-            for (int x = 0; x < edges.Width; x++)
-            {
-                if (!edges.IsEdgePixel(x, y)) continue;
-                float mag = edges.GetMagnitude(x, y);
-                float ang = edges.GetAngle(x, y);
-                dipoles.Add(new Dipole
-                {
-                    X = x + 0.5f,
-                    Y = y + 0.5f,
-                    Angle = ang,
-                    Strength = mag,
-                    Weight = 1.0f
-                });
-            }
-        }
-        return dipoles;
+        EdgeDetector = detector;
     }
 
     // ------------------------------------------------------------------
-    //  Chain building (run-length grouping by connectivity)
+    //  Training
     // ------------------------------------------------------------------
-    public List<List<Dipole>> BuildChains(List<Dipole> dipoles, double spacing = 2.0)
-    {
-        var chains = new List<List<Dipole>>();
-        if (dipoles.Count == 0) return chains;
-
-        var remaining = new List<Dipole>(dipoles);
-        while (remaining.Count > 0)
-        {
-            var chain = new List<Dipole> { remaining[0] };
-            remaining.RemoveAt(0);
-            bool grew = true;
-            while (grew)
-            {
-                grew = false;
-                var tail = chain[chain.Count - 1];
-                for (int i = remaining.Count - 1; i >= 0; i--)
-                {
-                    double dx = remaining[i].X - tail.X, dy = remaining[i].Y - tail.Y;
-                    if (dx * dx + dy * dy <= spacing * spacing)
-                    {
-                        chain.Add(remaining[i]);
-                        remaining.RemoveAt(i);
-                        grew = true;
-                        break;
-                    }
-                }
-            }
-            chains.Add(chain);
-        }
-        chains.RemoveAll(c => c.Count < 2);
-        return chains;
-    }
-
-    // ------------------------------------------------------------------
-    //  Featurelet sampling
-    // ------------------------------------------------------------------
-    private List<Featurelet> SampleFeaturelets(List<List<Dipole>> chains, int maxPerChain = 12)
-    {
-        var fts = new List<Featurelet>();
-        for (int c = 0; c < chains.Count; c++)
-        {
-            var chain = chains[c];
-            double arc = 0;
-            int step = Math.Max(1, chain.Count / Math.Max(1, maxPerChain));
-            for (int i = 0; i < chain.Count; i += step)
-            {
-                var d = chain[i];
-                if (i > 0)
-                {
-                    var p = chain[i - 1];
-                    arc += Math.Sqrt(Math.Pow(d.X - p.X, 2) + Math.Pow(d.Y - p.Y, 2));
-                }
-                fts.Add(new Featurelet
-                {
-                    X = d.X, Y = d.Y,
-                    Angle = d.Angle,
-                    Angle8 = d.Angle8,
-                    Magnitude = d.Strength,
-                    ChainIndex = c,
-                    ChainPosition = (float)arc,
-                    Weight = 1.0 + d.Strength / 255.0
-                });
-            }
-        }
-        return fts;
-    }
-
-    // ------------------------------------------------------------------
-    //  Train
-    // ------------------------------------------------------------------
+    /// <summary>Train using the whole image as the region.</summary>
     public PatternModel Train(GrayImage image, double originX = 0, double originY = 0, double grain = 1.0)
     {
-        var edges = EdgeDetector.Detect(image);
-        var dipoles = ExtractDipoles(edges);
-        var chains = BuildChains(dipoles);
-        var featurelets = SampleFeaturelets(chains);
+        if (image == null) throw new ArgumentNullException(nameof(image));
+        return Train(image, new RectI(0, 0, image.Width, image.Height), originX, originY, grain);
+    }
 
-        // Capture the edge-magnitude template for the robust NCC matcher.
-        var tmpl = new float[image.Width * image.Height];
-        for (int y = 0; y < image.Height; y++)
-            for (int x = 0; x < image.Width; x++)
-                tmpl[y * image.Width + x] = edges.GetMagnitude(x, y);
-
-        var pattern = new PatternModel
+    /// <summary>Train from a region of <paramref name="image"/>; the origin is in image coordinates.</summary>
+    public PatternModel Train(GrayImage image, RectI roi, double originX, double originY, double grain = 1.0)
+    {
+        var opt = new TrainOptions
         {
-            OriginX = originX,
-            OriginY = originY,
+            MaxFeatures = TrainMaxFeatures,
+            MinSpacing = TrainMinSpacing,
+            ContrastThreshold = TrainContrastThreshold,
             Grain = grain,
-            Template = tmpl,
-            TemplateWidth = image.Width,
-            TemplateHeight = image.Height
+            NoiseFloor = NoiseFloor,
+            N = ScoreExponentN,
+            IgnorePolarity = IgnorePolarity
         };
-        foreach (var f in featurelets) pattern.AddFeaturelet(f);
-        pattern.N = 2.0;   // exponent denominator (tuned for discriminative scoring)
+        Pattern = PatternTrainer.Train(image, roi, originX, originY, EdgeDetector, opt);
+        return Pattern;
+    }
 
-        Pattern = pattern;
-        return pattern;
+    /// <summary>Train from a region, with the origin at the region centre (the usual case).</summary>
+    public PatternModel TrainRegion(GrayImage image, RectI roi, double grain = 1.0)
+    {
+        var r = roi.Clamp(image.Width, image.Height);
+        if (r.IsEmpty) throw new ArgumentException("train region is empty", nameof(roi));
+        return Train(image, r, r.X + (r.Width - 1) / 2.0, r.Y + (r.Height - 1) / 2.0, grain);
     }
 
     // ------------------------------------------------------------------
-    //  Run
+    //  Running
     // ------------------------------------------------------------------
+    /// <summary>
+    /// Locate the trained <see cref="Pattern"/> in <paramref name="image"/>. The tool's parameter
+    /// properties are copied into a fresh SearchOptions for the call; timing lands in
+    /// <see cref="LastDiagnostics"/>. Returns at most <paramref name="maxResults"/> results,
+    /// best score first; an empty list means nothing was accepted.
+    /// </summary>
     public List<MatchResult> Run(GrayImage image, int maxResults = 10)
     {
         if (Pattern == null || !Pattern.Trained)
             throw new InvalidOperationException("pattern not trained");
 
-        // Optional Gaussian pre-smooth for noise robustness
-        GrayImage smoothed = image;
-        if (PreSmoothSigma > 0) smoothed = GaussianSmooth(image, PreSmoothSigma);
+        var options = BuildOptions(maxResults);
+        var prepared = Prepare(image);
 
-        var edges = EdgeDetector.Detect(smoothed);
+        // The engine reports its own timing; copy into the shared diagnostics object.
+        var diag = new SearchDiagnostics();
+        var results = Engine.Run(Pattern, prepared, EdgeDetector, options, diag);
+        CopyDiagnostics(diag);
 
-        // Prefer the robust grid matcher (coverage based).
-        if (Pattern != null && Pattern.FeatureCount > 0)
-        {
-            var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-            var tmpl = MatchByTemplate(edges);
-            if (tmpl.Count > 0)
-            {
-                return tmpl;
-            }
-        }
+        if (!SubpixelRefinement)
+            foreach (var r in results) r.FitError = double.NaN;
 
-        var results = new List<MatchResult>();
-
-        // ------------------------------------------------------------------
-        // Feature voting (geometric Hough): each edge votes for the object
-        // origin implied by every featurelet whose angle it matches.
-        // ------------------------------------------------------------------
-        int step = Math.Max(1, PrecisionStep);
-        int accW = Math.Max(1, image.Width / step), accH = Math.Max(1, image.Height / step);
-        var accumulator = new double[accW, accH];
-
-        // index featurelets by 8-bit angle for fast lookup
-        var byAngle = new Dictionary<byte, List<Featurelet>>();
-        foreach (var ft in Pattern.Featurelets)
-        {
-            if (!byAngle.TryGetValue(ft.Angle8, out var list)) { list = new List<Featurelet>(); byAngle[ft.Angle8] = list; }
-            list.Add(ft);
-        }
-
-        for (int y = 0; y < edges.Height; y++)
-        {
-            for (int x = 0; x < edges.Width; x++)
-            {
-                if (!edges.IsEdgePixel(x, y)) continue;
-                float ang = edges.GetAngle(x, y);
-                byte a8 = (byte)((int)(ang * 40.74366543152521) & 0xFF);
-
-                for (int d = -2; d <= 2; d++)
-                {
-                    var key = (byte)((a8 + d) & 0xFF);
-                    if (!byAngle.TryGetValue(key, out var angleMatches)) continue;
-                    foreach (var ft in angleMatches)
-                    {
-                        double ox = x - (ft.X - Pattern.OriginX);
-                        double oy = y - (ft.Y - Pattern.OriginY);
-                        int ax = (int)(ox / step), ay = (int)(oy / step);
-                        if (ax >= 0 && ay >= 0 && ax < accW && ay < accH)
-                            accumulator[ax, ay] += ft.Weight;
-                    }
-                }
-            }
-        }
-
-        // ------------------------------------------------------------------
-        // Find peaks in the voting accumulator (candidate origins)
-        // ------------------------------------------------------------------
-        var candidates = new List<(double x, double y, double votes)>();
-        double maxVote = 0;
-        for (int ay = 0; ay < accH; ay++)
-            for (int ax = 0; ax < accW; ax++)
-                maxVote = Math.Max(maxVote, accumulator[ax, ay]);
-
-        LastVotePeak = FindPeak(accumulator, accW, accH, step);
-        double voteThreshold = maxVote * PeakDetector.MaxAcceptablePeakFraction;
-        var taken = new bool[accW, accH];
-        for (int ay = 0; ay < accH; ay++)
-        {
-            for (int ax = 0; ax < accW; ax++)
-            {
-                double v = accumulator[ax, ay];
-                if (v < voteThreshold) continue;
-
-                // non-max suppression in a PeakSeparationThreshold window (in accumulator cells)
-                int win = Math.Max(1, PeakDetector.PeakSeparationThreshold / step);
-                bool isMax = true;
-                for (int dy = -win; dy <= win && isMax; dy++)
-                    for (int dx = -win; dx <= win && isMax; dx++)
-                    {
-                        int nx = ax + dx, ny = ay + dy;
-                        if (nx < 0 || ny < 0 || nx >= accW || ny >= accH) continue;
-                        if (accumulator[nx, ny] > v) { isMax = false; break; }
-                    }
-                if (!isMax) continue;
-
-                // sub-pixel refinement by parabolic interpolation of the accumulator
-                double subX = 0.0, subY = 0.0;
-                if (SubpixelRefinement && ax > 0 && ax < accW - 1 && ay > 0 && ay < accH - 1)
-                {
-                    double vL = accumulator[ax - 1, ay], vR = accumulator[ax + 1, ay];
-                    double dx1 = vL - 2.0 * v + vR;
-                    if (Math.Abs(dx1) > 1e-9) subX = 0.5 * (vL - vR) / dx1;
-                    double vD = accumulator[ax, ay - 1], vU = accumulator[ax, ay + 1];
-                    double dy1 = vD - 2.0 * v + vU;
-                    if (Math.Abs(dy1) > 1e-9) subY = 0.5 * (vD - vU) / dy1;
-                }
-                candidates.Add((ax * step + subX * step, ay * step + subY * step, v));
-            }
-        }
-        candidates.Sort((a, b) => b.votes.CompareTo(a.votes));
-
-        // Cluster nearby candidates (robustness against duplicate detections)
-        if (EnableClustering && candidates.Count > 1)
-        {
-            var clustered = new List<(double x, double y, double votes)>();
-            var used = new bool[candidates.Count];
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                if (used[i]) continue;
-                double sx = 0, sy = 0, sw = 0;
-                for (int j = i; j < candidates.Count; j++)
-                {
-                    if (used[j]) continue;
-                    double dx = candidates[j].x - candidates[i].x;
-                    double dy = candidates[j].y - candidates[i].y;
-                    if (dx * dx + dy * dy > ClusterRadius * ClusterRadius) continue;
-                    used[j] = true;
-                    sx += candidates[j].x * candidates[j].votes;
-                    sy += candidates[j].y * candidates[j].votes;
-                    sw += candidates[j].votes;
-                }
-                if (sw > 0) clustered.Add((sx / sw, sy / sw, sw));
-            }
-            clustered.Sort((a, b) => b.votes.CompareTo(a.votes));
-            candidates = clustered;
-        }
-
-        // ------------------------------------------------------------------
-        // Verify each candidate: match featurelets against the local edges
-        // ------------------------------------------------------------------
-        double norm = 1.0;   // S (magScale normalization) normalized to 1 for this demo
-        foreach (var cand in candidates)
-        {
-            if (results.Count >= maxResults) break;
-
-            double originX = cand.x, originY = cand.y;
-            var srcPts = new List<LeastSquaresFitter.Point2D>();
-            var dstPts = new List<LeastSquaresFitter.Point2D>();
-            int matched = 0, bad = 0;
-
-            foreach (var ft in Pattern.Featurelets)
-            {
-                double ex = originX + (ft.X - Pattern.OriginX);
-                double ey = originY + (ft.Y - Pattern.OriginY);
-                int ix = (int)Math.Round(ex), iy = (int)Math.Round(ey);
-                if (ix < 0 || iy < 0 || ix >= edges.Width || iy >= edges.Height) { bad++; continue; }
-
-                float mag = edges.GetMagnitude(ix, iy);
-                if (mag <= 0) { bad++; continue; }
-
-                double diff = Math.Abs(NormalizeAngle(edges.GetAngle(ix, iy) - ft.Angle));
-                if (diff < Math.PI / 6)
-                {
-                    matched++;
-                    srcPts.Add(new LeastSquaresFitter.Point2D(ft.X - Pattern.OriginX, ft.Y - Pattern.OriginY));
-                    dstPts.Add(new LeastSquaresFitter.Point2D(ex - originX, ey - originY));
-                }
-                else bad++;
-            }
-
-            double score = Scorer.Score(Pattern, matched, norm, bad, 0.5);
-
-            double poseX = originX, poseY = originY, poseAngle = 0, poseScale = 1.0;
-            if (srcPts.Count >= 3)
-            {
-                try
-                {
-                    var xf = Fitter.Fit(srcPts, dstPts, LeastSquaresFitter.FitType.Affine);
-                    poseX = originX + xf.Tx;
-                    poseY = originY + xf.Ty;
-                    poseScale = Math.Sqrt(Math.Abs(xf.Det));
-                    poseAngle = Math.Atan2(xf.M10, xf.M00);
-                }
-                catch { /* keep hypothesis */ }
-            }
-
-            bool accepted = score >= AcceptThreshold;
-            results.Add(new MatchResult
-            {
-                Score = score,
-                Accepted = accepted,
-                X = poseX,
-                Y = poseY,
-                Angle = poseAngle,
-                Scale = poseScale,
-                Coverage = Pattern.FeatureCount > 0 ? (double)matched / Pattern.FeatureCount : 0,
-                MatchedFeatures = matched,
-                BadFeatures = bad,
-                PeakValue = cand.votes
-            });
-        }
-
-        results.Sort((a, b) => b.Score.CompareTo(a.Score));
         return results;
     }
 
-    /// <summary>
-    /// Run all models in a multi-pattern set (cfMultiRun -> ccPMMultiModel::run).
-    /// </summary>
+    /// <summary>Run a multi-pattern set and return the merged, ranked results.</summary>
     public List<MatchResult> RunMulti(GrayImage image, PatternMulti multi, int maxResults = 10)
     {
-        var all = new List<MatchResult>();
+        if (multi == null || !multi.Trained) return new List<MatchResult>();
+
+        var prepared = Prepare(image);
+        var merged = new List<MatchResult>();
+        int index = 0;
+
         foreach (var model in multi.SelectModels(_ => 0.0))
         {
-            Pattern = model;
-            all.AddRange(Run(image, maxResults));
+            if (model == null || !model.Trained) { index++; continue; }
+            var diag = new SearchDiagnostics();
+            var options = BuildOptions(maxResults);
+            var results = Engine.Run(model, prepared, EdgeDetector, options, diag);
+            foreach (var r in results)
+            {
+                r.ModelIndex = index;
+                r.ModelId = multi.IdOf(model) ?? $"model-{index}";
+                merged.Add(r);
+            }
+            index++;
         }
-        all.Sort((a, b) => b.Score.CompareTo(a.Score));
-        return all.Take(maxResults).ToList();
+
+        merged.Sort((a, b) => b.Score.CompareTo(a.Score));
+        return merged.Count > maxResults ? merged.GetRange(0, maxResults) : merged;
+    }
+
+    private GrayImage Prepare(GrayImage image)
+    {
+        if (image == null) throw new ArgumentNullException(nameof(image));
+        if (PreSmoothSigma > 0.6)
+            return PatternTrainer.Blur(image, PreSmoothSigma);
+        return image;
+    }
+
+    private SearchOptions BuildOptions(int maxResults) => new()
+    {
+        AngleMin = RotationAngleMin,
+        AngleMax = RotationAngleMax,
+        ScaleMin = ScaleMin,
+        ScaleMax = ScaleMax,
+        AcceptThreshold = AcceptThreshold,
+        CoarseAcceptThreshold = CoarseAcceptThreshold,
+        ContrastThreshold = ContrastThreshold,
+        MaxResults = Math.Max(1, maxResults),
+        CoarseFeatureCount = CoarseFeatureCount,
+        MidFeatureCount = MidFeatureCount,
+        MaxCandidates = MaxCandidates,
+        CoarseStride = Math.Max(1, PrecisionStep),
+        CoarseAngleStepDeg = CoarseAngleStepDeg,
+        SubpixelRefinement = SubpixelRefinement,
+        OverlapSuppression = 0.55,
+        MinSeparationPixels = EnableClustering ? Math.Max(0, ClusterRadius) : 0.0,
+        UseClutter = UseClutter,
+        MaxLevels = MaxLevels,
+        TimeoutMs = TimeoutMs
+    };
+
+    private void CopyDiagnostics(SearchDiagnostics src)
+    {
+        LastDiagnostics.EdgeMs = src.EdgeMs;
+        LastDiagnostics.CoarseMs = src.CoarseMs;
+        LastDiagnostics.RefineMs = src.RefineMs;
+        LastDiagnostics.VerifyMs = src.VerifyMs;
+        LastDiagnostics.TotalMs = src.TotalMs;
+        LastDiagnostics.CoarseLevel = src.CoarseLevel;
+        LastDiagnostics.CoarseCandidates = src.CoarseCandidates;
+        LastDiagnostics.ScoredPositions = src.ScoredPositions;
+        LastDiagnostics.PyramidLevels = src.PyramidLevels;
+    }
+
+    // ------------------------------------------------------------------
+    //  Diagnostics / helpers kept from the earlier revision
+    // ------------------------------------------------------------------
+    /// <summary>
+    /// Convert an edge field into dipoles (one per edge pixel), each displaced by
+    /// <paramref name="scale"/> pixels along its own normal so that it sits on the edge.
+    /// </summary>
+    public List<Dipole> ExtractDipoles(EdgeMap edges, double scale = 0.5)
+    {
+        var dipoles = new List<Dipole>();
+        if (edges == null) return dipoles;
+
+        for (int y = 0; y < edges.Height; y++)
+            for (int x = 0; x < edges.Width; x++)
+            {
+                int i = y * edges.Width + x;
+                if (!edges.IsEdge[i]) continue;
+                float mag = edges.Magnitude[i];
+                float ang = (float)Math.Atan2(edges.Gy[i], edges.Gx[i]);
+                dipoles.Add(new Dipole
+                {
+                    X = x + 0.5f + (float)(scale * Math.Cos(ang)),
+                    Y = y + 0.5f + (float)(scale * Math.Sin(ang)),
+                    Angle = ang,
+                    Strength = mag,
+                    Weight = 1.0f
+                });
+            }
+        return dipoles;
     }
 
     /// <summary>
-    /// Robust normalized cross-correlation of the trained edge template over the
-    /// search image. Returns candidate origins with correlation scores.
+    /// Group dipoles into chains by radius connectivity (dipoles closer than 'spacing' land in
+    /// the same chain), implemented as a breadth-first flood over a spatial hash. This is
+    /// proximity connectivity, not strict 8-connectivity. The previous nearest-neighbour loop
+    /// was O(n^2) and unusable above a few thousand edge pixels.
     /// </summary>
-    private List<MatchResult> MatchByTemplate(GaborEdgeDetector.EdgeMap edges)
+    public List<List<Dipole>> BuildChains(List<Dipole> dipoles, double spacing = 2.0)
     {
-        var results = new List<MatchResult>();
-        if (Pattern == null || Pattern.FeatureCount == 0) return results;
+        var chains = new List<List<Dipole>>();
+        if (dipoles == null || dipoles.Count == 0) return chains;
 
-        int tw = Pattern.TemplateWidth, th = Pattern.TemplateHeight;
-        int w = edges.Width, h = edges.Height;
-        if (tw > w || th > h) return results;
-
-        var mag = new float[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                mag[y * w + x] = edges.GetMagnitude(x, y);
-
-        double tMean = 0;
-        for (int i = 0; i < Pattern.Template.Length; i++) tMean += Pattern.Template[i];
-        tMean /= Pattern.Template.Length;
-        double tEnergy = 0;
-        var tNorm = new float[Pattern.Template.Length];
-        for (int i = 0; i < tNorm.Length; i++) { tNorm[i] = (float)(Pattern.Template[i] - tMean); tEnergy += tNorm[i] * tNorm[i]; }
-        if (tEnergy <= 1e-9) return results;
-        tEnergy = Math.Sqrt(tEnergy);
-
-        int maxX = w - tw, maxY = h - th;
-        // Downsample for the coarse pass (4x) to make it fast.
-        int ds = Math.Max(2, Math.Min(6, PrecisionStep * 3));
-        var (magDs, wDs, hDs, twDs, thDs) = Downsample(mag, w, h, tw, th, ds);
-        int maxXDs = wDs - twDs, maxYDs = hDs - thDs;
-
-        int coarse = Math.Max(1, PrecisionStep);
-        double bestScore = -1;
-        int bestX = 0, bestY = 0; double bestAngle = 0;
-
-        // ---- rotation search (coarse then fine) ----
-        double aMin = RotationAngleMin, aMax = RotationAngleMax;
-        if (aMax - aMin < 1e-6) { aMin = -180; aMax = 180; }
-        double aStep = Math.Max(5.0, (aMax - aMin) / 24.0);
-        var angles = new List<double>();
-        for (double a = aMin; a <= aMax; a += aStep) angles.Add(a);
-        if (angles.Count == 0) angles.Add(0);
-
-        foreach (double ang in angles)
+        int cell = Math.Max(1, (int)Math.Ceiling(spacing));
+        var buckets = new Dictionary<long, List<int>>();
+        for (int i = 0; i < dipoles.Count; i++)
         {
-            double c = Math.Cos(ang * Math.PI / 180.0), s2 = Math.Sin(ang * Math.PI / 180.0);
-            // rotated template
-            var rt = new float[tw * th];
-            for (int ty = 0; ty < th; ty++)
-                for (int tx = 0; tx < tw; tx++)
-                {
-                    double dx = tx - tw / 2.0, dy = ty - th / 2.0;
-                    double sx = c * dx + s2 * dy + tw / 2.0;
-                    double sy = -s2 * dx + c * dy + th / 2.0;
-                    int x0 = (int)Math.Floor(sx), y0 = (int)Math.Floor(sy);
-                    if (x0 < 0 || y0 < 0 || x0 >= tw - 1 || y0 >= th - 1) continue;
-                    double fx = sx - x0, fy = sy - y0;
-                    rt[ty * tw + tx] = (float)(
-                        tNorm[y0 * tw + x0] * (1 - fx) * (1 - fy) +
-                        tNorm[y0 * tw + x0 + 1] * fx * (1 - fy) +
-                        tNorm[(y0 + 1) * tw + x0] * (1 - fx) * fy +
-                        tNorm[(y0 + 1) * tw + x0 + 1] * fx * fy);
-                }
-            double rtEnergy = 0;
-            for (int i = 0; i < rt.Length; i++) rtEnergy += rt[i] * rt[i];
-            if (rtEnergy <= 1e-9) continue;
-            rtEnergy = Math.Sqrt(rtEnergy);
-            // downsample the rotated template for the coarse pass
-            var rtDs = new float[twDs * thDs];
-            for (int y = 0; y < thDs; y++)
-                for (int x = 0; x < twDs; x++)
-                    rtDs[y * twDs + x] = rt[(y * ds) * tw + (x * ds)];
-            double rtDsEnergy = 0;
-            for (int i = 0; i < rtDs.Length; i++) rtDsEnergy += rtDs[i] * rtDs[i];
-            if (rtDsEnergy <= 1e-9) continue;
-            rtDsEnergy = Math.Sqrt(rtDsEnergy);
+            long key = Key((int)(dipoles[i].X / cell), (int)(dipoles[i].Y / cell));
+            if (!buckets.TryGetValue(key, out var list)) buckets[key] = list = new List<int>();
+            list.Add(i);
+        }
 
-            if (maxXDs < 0) continue;
-            for (int oy = 0; oy <= maxYDs; oy += coarse)
+        var visited = new bool[dipoles.Count];
+        var queue = new Queue<int>();
+        double radiusSq = spacing * spacing;
+
+        for (int seed = 0; seed < dipoles.Count; seed++)
+        {
+            if (visited[seed]) continue;
+            visited[seed] = true;
+            queue.Clear();
+            queue.Enqueue(seed);
+            var chain = new List<Dipole>();
+
+            while (queue.Count > 0)
             {
-                for (int ox = 0; ox <= maxXDs; ox += coarse)
-                {
-                    double dot = 0, iEnergy = 0;
-                    for (int ty = 0; ty < thDs; ty++)
+                int cur = queue.Dequeue();
+                chain.Add(dipoles[cur]);
+                int cx = (int)(dipoles[cur].X / cell), cy = (int)(dipoles[cur].Y / cell);
+
+                for (int gy = cy - 1; gy <= cy + 1; gy++)
+                    for (int gx = cx - 1; gx <= cx + 1; gx++)
                     {
-                        int row = (oy + ty) * wDs + ox;
-                        int tRow = ty * twDs;
-                        for (int tx = 0; tx < twDs; tx++)
+                        if (!buckets.TryGetValue(Key(gx, gy), out var bucket)) continue;
+                        foreach (int other in bucket)
                         {
-                            float iv = magDs[row + tx];
-                            dot += rtDs[tRow + tx] * iv;
-                            iEnergy += iv * iv;
+                            if (visited[other]) continue;
+                            double dx = dipoles[other].X - dipoles[cur].X;
+                            double dy = dipoles[other].Y - dipoles[cur].Y;
+                            if (dx * dx + dy * dy > radiusSq) continue;
+                            visited[other] = true;
+                            queue.Enqueue(other);
                         }
                     }
-                    double denom = rtDsEnergy * Math.Sqrt(iEnergy);
-                    double cc = denom > 1e-9 ? dot / denom : 0;
-                    if (cc > bestScore) { bestScore = cc; bestX = ox * ds; bestY = oy * ds; bestAngle = ang; }
-                }
             }
+            if (chain.Count >= 2) chains.Add(chain);
         }
-        if (bestScore <= 0) return results;
+        return chains;
 
-        // fine pass around the best angle/position
-        int win = coarse * 2;
-        double fineBest = bestScore; int fineX2 = bestX, fineY2 = bestY; double fineA = bestAngle;
-        for (double ang = bestAngle - aStep; ang <= bestAngle + aStep; ang += Math.Max(1.0, aStep / 5))
-        {
-            double c = Math.Cos(ang * Math.PI / 180.0), s2 = Math.Sin(ang * Math.PI / 180.0);
-            var rt = new float[tw * th];
-            for (int ty = 0; ty < th; ty++)
-                for (int tx = 0; tx < tw; tx++)
-                {
-                    double dx = tx - tw / 2.0, dy = ty - th / 2.0;
-                    double sx = c * dx + s2 * dy + tw / 2.0;
-                    double sy = -s2 * dx + c * dy + th / 2.0;
-                    int x0 = (int)Math.Floor(sx), y0 = (int)Math.Floor(sy);
-                    if (x0 < 0 || y0 < 0 || x0 >= tw - 1 || y0 >= th - 1) continue;
-                    double ffx = sx - x0, ffy = sy - y0;
-                    rt[ty * tw + tx] = (float)(
-                        tNorm[y0 * tw + x0] * (1 - ffx) * (1 - ffy) +
-                        tNorm[y0 * tw + x0 + 1] * ffx * (1 - ffy) +
-                        tNorm[(y0 + 1) * tw + x0] * (1 - ffx) * ffy +
-                        tNorm[(y0 + 1) * tw + x0 + 1] * ffx * ffy);
-                }
-            double rtEnergy = 0;
-            for (int i = 0; i < rt.Length; i++) rtEnergy += rt[i] * rt[i];
-            if (rtEnergy <= 1e-9) continue;
-            rtEnergy = Math.Sqrt(rtEnergy);
-            for (int oy = Math.Max(0, bestY - win); oy <= Math.Min(maxY, bestY + win); oy++)
-            {
-                for (int ox = Math.Max(0, bestX - win); ox <= Math.Min(maxX, bestX + win); ox++)
-                {
-                    double dot = 0, iEnergy = 0;
-                    for (int ty = 0; ty < th; ty++)
-                    {
-                        int row = (oy + ty) * w + ox;
-                        int tRow = ty * tw;
-                        for (int tx = 0; tx < tw; tx++)
-                        {
-                            float iv = mag[row + tx];
-                            dot += rt[tRow + tx] * iv;
-                            iEnergy += iv * iv;
-                        }
-                    }
-                    double denom = rtEnergy * Math.Sqrt(iEnergy);
-                    double cc = denom > 1e-9 ? dot / denom : 0;
-                    if (cc > fineBest) { fineBest = cc; fineX2 = ox; fineY2 = oy; fineA = ang; }
-                }
-            }
-        }
-
-        // verify with featurelet coverage
-        double originX = fineX2 + Pattern.OriginX;
-        double originY = fineY2 + Pattern.OriginY;
-        int matched = 0;
-        foreach (var ft in Pattern.Featurelets)
-        {
-            int ix = (int)Math.Round(originX + ft.X - Pattern.OriginX);
-            int iy = (int)Math.Round(originY + ft.Y - Pattern.OriginY);
-            if (ix >= 0 && iy >= 0 && ix < w && iy < h && edges.GetMagnitude(ix, iy) > 0) matched++;
-        }
-        double coverage = (double)matched / Pattern.FeatureCount;
-
-        results.Add(new MatchResult
-        {
-            Score = Math.Max(0, Math.Min(1, coverage)),
-            X = originX, Y = originY,
-            Angle = fineA, Scale = 1.0,
-            Coverage = coverage,
-            MatchedFeatures = matched,
-            BadFeatures = Pattern.FeatureCount - matched,
-            Accepted = coverage >= AcceptThreshold
-        });
-        return results;
-    }
-
-    private List<MatchResult> MatchByGrid(GaborEdgeDetector.EdgeMap edges)
-    {
-        var results = new List<MatchResult>();
-        if (Pattern == null || Pattern.FeatureCount == 0) return results;
-
-        int w = edges.Width, h = edges.Height;
-        int step = Math.Max(1, PrecisionStep);
-        int margin = 8;
-        int bestCount = -1;
-        var peaks = new List<(double x, double y, int count)>();
-
-        for (int oy = margin; oy < h - margin; oy += step)
-        {
-            for (int ox = margin; ox < w - margin; ox += step)
-            {
-                int matched = 0;
-                for (int f = 0; f < Pattern.Featurelets.Count; f++)
-                {
-                    var ft = Pattern.Featurelets[f];
-                    int ix = ox + (int)Math.Round(ft.X - Pattern.OriginX);
-                    int iy = oy + (int)Math.Round(ft.Y - Pattern.OriginY);
-                    if (ix >= 0 && iy >= 0 && ix < w && iy < h && edges.GetMagnitude(ix, iy) > 0) matched++;
-                }
-                if (matched > bestCount) { bestCount = matched; peaks.Clear(); peaks.Add((ox, oy, matched)); }
-                else if (matched == bestCount && peaks.Count < 50) peaks.Add((ox, oy, matched));
-            }
-        }
-
-        if (bestCount <= 0) return results;
-
-        // refine around the best peak (sub-pixel via centroid of matched featurelets)
-        foreach (var p in peaks)
-        {
-            double sumX = 0, sumY = 0; int n = 0;
-            foreach (var ft in Pattern.Featurelets)
-            {
-                int ix = (int)Math.Round(p.x + ft.X - Pattern.OriginX);
-                int iy = (int)Math.Round(p.y + ft.Y - Pattern.OriginY);
-                if (ix >= 0 && iy >= 0 && ix < w && iy < h && edges.GetMagnitude(ix, iy) > 0)
-                {
-                    sumX += (p.x + ft.X - Pattern.OriginX) - ix;
-                    sumY += (p.y + ft.Y - Pattern.OriginY) - iy;
-                    n++;
-                }
-            }
-            double rx = p.x + (n > 0 ? sumX / n : 0);
-            double ry = p.y + (n > 0 ? sumY / n : 0);
-            double coverage = (double)p.count / Pattern.FeatureCount;
-            results.Add(new MatchResult
-            {
-                Score = coverage,
-                X = rx, Y = ry,
-                Angle = 0, Scale = 1.0,
-                Coverage = coverage,
-                MatchedFeatures = p.count,
-                BadFeatures = Pattern.FeatureCount - p.count,
-                Accepted = coverage >= AcceptThreshold
-            });
-        }
-        results.Sort((a, b) => b.Score.CompareTo(a.Score));
-        return results;
-    }
-
-    private static (float[] mag, int w, int h, int tw, int th) Downsample(
-        float[] src, int sw, int sh, int stw, int sth, int ds)
-    {
-        int w = Math.Max(1, sw / ds), h = Math.Max(1, sh / ds);
-        int tw = Math.Max(1, stw / ds), th = Math.Max(1, sth / ds);
-        var dst = new float[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                double acc = 0; int cnt = 0;
-                for (int dy = 0; dy < ds; dy++)
-                {
-                    int sy = y * ds + dy; if (sy >= sh) break;
-                    for (int dx = 0; dx < ds; dx++)
-                    {
-                        int sx = x * ds + dx; if (sx >= sw) break;
-                        acc += src[sy * sw + sx]; cnt++;
-                    }
-                }
-                dst[y * w + x] = cnt > 0 ? (float)(acc / cnt) : 0f;
-            }
-        return (dst, w, h, tw, th);
-    }
-
-    private static (double, double, double) FindPeak(double[,] acc, int w, int h, int step)
-    {
-        double max = 0; int mx = 0, my = 0;
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                if (acc[x, y] > max) { max = acc[x, y]; mx = x; my = y; }
-        return (mx * step, my * step, max);
-    }
-
-    /// <summary>Separable Gaussian smoothing (noise robustness).</summary>
-    private static GrayImage GaussianSmooth(GrayImage src, double sigma)
-    {
-        int w = src.Width, h = src.Height;
-        int r = Math.Max(1, (int)Math.Ceiling(3 * sigma));
-        var kernel = new double[2 * r + 1];
-        double sum = 0;
-        for (int i = -r; i <= r; i++) { kernel[i + r] = Math.Exp(-(i * i) / (2 * sigma * sigma)); sum += kernel[i + r]; }
-        for (int i = 0; i < kernel.Length; i++) kernel[i] /= sum;
-
-        var tmp = new GrayImage(w, h);
-        var dst = new GrayImage(w, h);
-
-        // horizontal
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                double acc = 0;
-                for (int k = -r; k <= r; k++)
-                {
-                    int sx = Math.Clamp(x + k, 0, w - 1);
-                    acc += src[sx, y] * kernel[k + r];
-                }
-                tmp[x, y] = (byte)Math.Clamp(acc, 0, 255);
-            }
-        // vertical
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                double acc = 0;
-                for (int k = -r; k <= r; k++)
-                {
-                    int sy = Math.Clamp(y + k, 0, h - 1);
-                    acc += tmp[x, sy] * kernel[k + r];
-                }
-                dst[x, y] = (byte)Math.Clamp(acc, 0, 255);
-            }
-        return dst;
-    }
-
-    private static double NormalizeAngle(double a)
-    {
-        while (a > Math.PI) a -= 2 * Math.PI;
-        while (a < -Math.PI) a += 2 * Math.PI;
-        return a;
+        static long Key(int x, int y) => ((long)x << 32) ^ (uint)y;
     }
 
     /// <summary>Fit a pose from matched feature correspondences (affine, type 6).</summary>
     public LeastSquaresFitter.LinearXform FitPose(
-        List<LeastSquaresFitter.Point2D> source,
-        List<LeastSquaresFitter.Point2D> target)
-    {
-        return Fitter.Fit(source, target, LeastSquaresFitter.FitType.Affine);
-    }
-}
-
-/// <summary>Match result (mirrors ccPMResult layout).</summary>
-public sealed class MatchResult
-{
-    public double Score { get; set; }          // +0x48
-    public double Contrast { get; set; }       // +0x4c
-    public double FitError { get; set; }       // +0x50
-    public double Coverage { get; set; }       // +0x54
-    public bool Accepted { get; set; }         // +0x5c
-    public double X { get; set; }
-    public double Y { get; set; }
-    public double Angle { get; set; }
-    public double Scale { get; set; }
-    public int MatchedFeatures { get; set; }
-    public int BadFeatures { get; set; }
-    public double PeakValue { get; set; }
-
-    public override string ToString() =>
-        $"Result(Score={Score:F3}, Pos=({X:F1},{Y:F1}), Coverage={Coverage:P0}, " +
-        $"Matched={MatchedFeatures}, Bad={BadFeatures}, Accepted={Accepted})";
+        IReadOnlyList<LeastSquaresFitter.Point2D> source,
+        IReadOnlyList<LeastSquaresFitter.Point2D> target)
+        => Fitter.Fit(source, target, LeastSquaresFitter.FitType.Affine);
 }

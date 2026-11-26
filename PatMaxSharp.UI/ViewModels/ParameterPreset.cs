@@ -16,8 +16,8 @@ public sealed class ParameterPreset
     // ---- Search parameters ----
     [JsonPropertyName("rotationAngleMin")] public double RotationAngleMin { get; set; } = -180;
     [JsonPropertyName("rotationAngleMax")] public double RotationAngleMax { get; set; } = 180;
-    [JsonPropertyName("scaleMin")] public double ScaleMin { get; set; } = 0.8;
-    [JsonPropertyName("scaleMax")] public double ScaleMax { get; set; } = 1.2;
+    [JsonPropertyName("scaleMin")] public double ScaleMin { get; set; } = 1.0;
+    [JsonPropertyName("scaleMax")] public double ScaleMax { get; set; } = 1.0;
     [JsonPropertyName("approximateNumberToFind")] public int ApproximateNumberToFind { get; set; } = 1;
     [JsonPropertyName("xyOverlap")] public double XYOverlap { get; set; } = 0.5;
     [JsonPropertyName("timeoutMs")] public double TimeoutMs { get; set; } = 5000;
@@ -57,9 +57,10 @@ public sealed class ParameterPreset
         new ParameterPreset
         {
             Name = "高精度 (High Precision)",
-            Description = "亚像素细化 + 细粒度，速度较慢",
+            Description = "亚像素细化 + 细粒度 + ±5% 尺度搜索，速度较慢",
             PrecisionStep = 1, SubpixelRefinement = true, Grain = 2.0,
-            CoarseGrainLimit = 8, FineGrainLimit = 4, AcceptThreshold = 0.6
+            CoarseGrainLimit = 8, FineGrainLimit = 4, AcceptThreshold = 0.6,
+            ScaleMin = 0.95, ScaleMax = 1.05
         },
         new ParameterPreset
         {

@@ -3,11 +3,17 @@ namespace PatMaxSharp.Transform;
 /// <summary>
 /// Thin-Plate Spline (TPS) deformation — the PatFlex model.
 ///
-/// Reconstructed from cc2XformDeform (reports/05-xform.md):
-///   kernel K(r) = r^2 * log2(r^2)      (threshold 1e-15)
-///   object layout: control count +0x70, coordinates +0x78, weights +0x98
-///   control parameters: ControlPointsX / ControlPointsY / Smoothness /
-///                       MaxDeformationRate / Refinement / DeformationFit
+/// Kernel K(r) = r^2 * log2(r^2), with r^2 below 1e-15 treated as 0.
+///
+/// Early analysis notes attributed the deformation model to a native cc2XformDeform object
+/// and quoted its layout (control count +0x70, coordinates +0x78, weights +0x98). The native
+/// core is WIBU-packed, so neither that class name nor those offsets can be checked
+/// statically, and neither is relied on here.
+///
+/// The public PatFlex control surface is ControlPointsX / ControlPointsY / Smoothness /
+/// MaxDeformationRate / Refinement / DeformationFit. This class implements the kernel and the
+/// least-squares fit only: Smoothness, MaxDeformationRate, Refinement and DeformationFit are
+/// named for reference and have no implementation yet.
 ///
 /// TPS model:
 ///   f(x) = a0 + ax*x + ay*y + Σ_i w_i K(||x - P_i||)
@@ -23,7 +29,10 @@ public sealed class XformTps
 
     /// <summary>Affine part [a0, ax, ay].</summary>
     public double A0 { get; private set; }
+    /// <summary>Linear part of the TPS transform, applied to x.</summary>
     public double Ax { get; private set; }
+
+    /// <summary>Linear part of the TPS transform, applied to y.</summary>
     public double Ay { get; private set; }
 
     /// <summary>TPS kernel: K(r) = r²·log2(r²).</summary>
