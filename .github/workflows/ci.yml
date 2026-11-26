@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # The WPF front end only builds on Windows, so the gate builds the core library
+      # explicitly and runs the headless accuracy suite on both platforms.
+      - name: Build core
+        run: dotnet build PatMaxSharp.csproj -c Release
+
+      - name: Accuracy self-test
+        run: dotnet run --project PatMaxSharp.csproj -c Release --no-build -- --selftest
+
+      - name: Build WPF UI
+        if: runner.os == 'Windows'
+        run: dotnet build PatMaxSharp.UI/PatMaxSharp.UI.csproj -c Release
