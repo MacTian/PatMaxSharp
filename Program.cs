@@ -5,6 +5,7 @@ using PatMaxSharp.Benchmarks;
 using PatMaxSharp.Core;
 using PatMaxSharp.Edge;
 using PatMaxSharp.Projection;
+using PatMaxSharp.Training;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -13,6 +14,32 @@ bool benchOnly = Has("--bench");
 bool quiet = Has("--quiet");
 
 bool Has(string flag) => args.Any(a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
+
+// ---------------------------------------------------------------------------
+//  --probe <image> [x y w h] : train one region and explain the outcome
+// ---------------------------------------------------------------------------
+int probeIndex = Array.FindIndex(args, a => a.Equals("--probe", StringComparison.OrdinalIgnoreCase));
+if (probeIndex >= 0 && probeIndex + 1 < args.Length)
+{
+    var probeImage = ImageLoader.Load(args[probeIndex + 1]);
+    var rect = probeIndex + 5 < args.Length
+        ? new RectI(int.Parse(args[probeIndex + 2]), int.Parse(args[probeIndex + 3]),
+                    int.Parse(args[probeIndex + 4]), int.Parse(args[probeIndex + 5]))
+        : PatternTrainer.ContentBounds(probeImage);
+    var crop = probeImage.Crop(rect);
+
+    var probeDetector = new GaborEdgeDetector();
+    var probeEdges = probeDetector.Detect(crop);
+    var probeTool = new PatMaxTool(probeDetector);
+    var probePattern = probeTool.Train(crop, crop.Width / 2.0, crop.Height / 2.0);
+
+    Console.WriteLine($"image   : {Path.GetFileName(args[probeIndex + 1])} {probeImage.Width}x{probeImage.Height}");
+    Console.WriteLine($"rect    : {rect}");
+    Console.WriteLine($"crop    : {crop.Width}x{crop.Height}  min={crop.Data.Min()} max={crop.Data.Max()} mean={crop.Data.Select(b => (int)b).Average():F1}");
+    Console.WriteLine($"edges   : pixels={probeEdges.EdgePixelCount} maxMag={probeEdges.MaxMagnitude:F1} floor={probeDetector.LastEffectiveFloor:F2}");
+    Console.WriteLine($"pattern : features={probePattern.FeatureCount} W={probePattern.W:F1} radius={probePattern.ExtentRadius:F1}");
+    return 0;
+}
 
 // ---------------------------------------------------------------------------
 //  --cal <dir> : validate against a folder of real PNG images

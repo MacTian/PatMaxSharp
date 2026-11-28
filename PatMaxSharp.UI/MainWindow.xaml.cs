@@ -32,6 +32,15 @@ public partial class MainWindow : Window
         else if (args.Length > 3 && args[1].Equals("--record", System.StringComparison.OrdinalIgnoreCase)
             && System.IO.Directory.Exists(args[2]))
             StartRecording(args[2], args[3]);
+        else if (args.Length > 6 && args[1].Equals("--show-region", System.StringComparison.OrdinalIgnoreCase)
+            && System.IO.File.Exists(args[2]))
+        {
+            // deterministic check that image coordinates land where they should: draw a region
+            // given in image pixels and see whether it sits on the part.
+            _vm.LoadImageFile(args[2]);
+            _vm.TrainRegion = new Rect(double.Parse(args[3]), double.Parse(args[4]),
+                                       double.Parse(args[5]), double.Parse(args[6]));
+        }
         else if (args.Length > 1 && System.IO.File.Exists(args[1]))
             _vm.LoadImageFile(args[1]);
 
@@ -39,6 +48,7 @@ public partial class MainWindow : Window
         rbSearch.Checked += (_, _) => viewer.SelectMode = RegionKind.Search;
 
         viewer.RegionChanged += _ => _vm.RefreshRegions();
+        viewer.GeometryReported += text => _vm.SetStatus(text);
 
         _vm.PropertyChanged += (_, e) =>
         {

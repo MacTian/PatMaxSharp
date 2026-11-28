@@ -21,7 +21,7 @@ public sealed class SearchOptions
 
     // ---- acceptance ----
     /// <summary>Minimum score to accept a result (acceptThreshold).</summary>
-    public double AcceptThreshold { get; set; } = 0.5;
+    public double AcceptThreshold { get; set; } = 0.7;
 
     /// <summary>
     /// Coarse-stage gate (CoarseAcceptThreshold). A hypothesis must reach this score at the

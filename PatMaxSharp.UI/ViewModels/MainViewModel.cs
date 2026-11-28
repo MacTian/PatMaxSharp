@@ -184,6 +184,30 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    // ---- training parameters (the panel that was missing) ----
+    private bool _IgnorePolarity;
+    public bool IgnorePolarity { get => _IgnorePolarity; set => Set(ref _IgnorePolarity, value); }
+
+    private int _TrainMaxFeatures = 600;
+    public int TrainMaxFeatures { get => _TrainMaxFeatures; set => Set(ref _TrainMaxFeatures, value); }
+
+    private double _TrainMinSpacing = 2.0;
+    public double TrainMinSpacing { get => _TrainMinSpacing; set => Set(ref _TrainMinSpacing, value); }
+
+    private double _EdgeThreshold = 8.0;
+    public double EdgeThreshold
+    {
+        get => _EdgeThreshold;
+        set { if (Set(ref _EdgeThreshold, value)) _tool.EdgeDetector.NoiseFloor = value; }
+    }
+
+    private bool _AutoEdgeThreshold = true;
+    public bool AutoEdgeThreshold
+    {
+        get => _AutoEdgeThreshold;
+        set { if (Set(ref _AutoEdgeThreshold, value)) _tool.EdgeDetector.AutoNoiseFloor = value; }
+    }
+
     private bool _showTrainRegion = true;
 
     /// <summary>
@@ -272,7 +296,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _ScaleMax;
         set => Set(ref _ScaleMax, value);
     }
-    private double _AcceptThreshold = 0.5;
+    private double _AcceptThreshold = 0.7;
     public double AcceptThreshold
     {
         get => _AcceptThreshold;
@@ -410,6 +434,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
             _tool.EdgeDetector.UseSimd = UseSimd;
             _tool.EdgeDetector.UseParallel = UseParallel;
+            _tool.EdgeDetector.NoiseFloor = EdgeThreshold;
+            _tool.EdgeDetector.AutoNoiseFloor = AutoEdgeThreshold;
+            _tool.IgnorePolarity = IgnorePolarity;
+            _tool.TrainMaxFeatures = Math.Max(20, TrainMaxFeatures);
+            _tool.TrainMinSpacing = Math.Max(1.0, TrainMinSpacing);
             var pattern = _tool.Train(crop, originX, originY, Grain);
 
             // A region over plain background yields no features. Say so instead of leaving a
@@ -418,13 +447,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
             {
                 Trained = false;
                 Status = $"训练失败: 框内只有 {pattern.FeatureCount} 个边缘特征 —— 请把训练框拖到目标上" +
-                         $"（当前区域 {r.X:F0},{r.Y:F0} 尺寸 {r.Width:F0}×{r.Height:F0}）";
+                         $"（区域 {r.X:F0},{r.Y:F0} {r.Width:F0}×{r.Height:F0}，" +
+                         $"实际裁剪 {crop.Width}×{crop.Height}，梯度门限 {_tool.EdgeDetector.LastEffectiveFloor:F2}）";
                 Results.Clear();
                 return;
             }
 
             Trained = true;
-            Status = $"训练完成: {pattern.FeatureCount} 特征, W={pattern.W:F2}, grain={Grain}";
+            Status = $"训练完成: {pattern.FeatureCount} 特征, W={pattern.W:F2}, " +
+                     $"grain={Grain}, 边缘阈值={_tool.EdgeDetector.LastEffectiveFloor:F1}" +
+                     $"{(_tool.Pattern.PolarityAgnostic ? ", 无极性" : "")}";
             Results.Clear();
         }
         catch (Exception ex)
@@ -792,18 +824,30 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     // ---- Image helpers ----
+    /// <summary>
+    /// Convert any WPF bitmap to 8-bit grey.
+    ///
+    /// The conversion goes through a FormatConvertedBitmap on purpose: the previous version
+    /// copied pixels straight out of the source assuming 4 bytes per pixel, which is only true
+    /// for Bgra32/Pbgra32. An 8-bit indexed or 24-bit image (every BMP this tool loads) came
+    /// back shifted or black, so a box dragged over the part contained no edges at all.
+    /// </summary>
     internal static GrayImage ToGray(BitmapSource src)
     {
         int w = src.PixelWidth, h = src.PixelHeight;
+        BitmapSource bgra = src;
+        if (src.Format != PixelFormats.Bgra32 && src.Format != PixelFormats.Pbgra32)
+            bgra = new FormatConvertedBitmap(src, PixelFormats.Bgra32, null, 0);
+
         var bytes = new byte[w * h * 4];
-        src.CopyPixels(bytes, w * 4, 0);
+        bgra.CopyPixels(bytes, w * 4, 0);
+
         var gray = new byte[w * h];
-        bool hasAlpha = src.Format == PixelFormats.Bgra32 || src.Format == PixelFormats.Pbgra32;
         for (int i = 0; i < w * h; i++)
         {
-            byte b = bytes[i * 4], g = bytes[i * 4 + 1], r = bytes[i * 4 + 2];
-            byte a = hasAlpha ? bytes[i * 4 + 3] : (byte)255;
-            gray[i] = (byte)((r * 0.299 + g * 0.587 + b * 0.114) * (a / 255.0));
+            byte b = bytes[i * 4], g = bytes[i * 4 + 1], r = bytes[i * 4 + 2], a = bytes[i * 4 + 3];
+            int lum = (r * 299 + g * 587 + b * 114) / 1000;
+            gray[i] = (byte)(a == 255 || a == 0 ? lum : lum * a / 255);
         }
         return new GrayImage(w, h, gray);
     }

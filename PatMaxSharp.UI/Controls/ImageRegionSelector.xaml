@@ -2,12 +2,19 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="Black">
-    <Grid>
-        <Canvas x:Name="canvas" Background="Black"
-                ClipToBounds="True"
-                MouseWheel="OnMouseWheel"
+    <!-- The bitmap is the canvas background, not a child element, so canvas coordinates ARE
+         image pixels: no offset, no letterbox, no element-vs-content mismatch. Children
+         (region rectangles, markers, overlay) are positioned in image pixels directly. -->
+    <ScrollViewer x:Name="scroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                  Background="Black">
+        <Canvas x:Name="canvas"
                 MouseLeftButtonDown="OnMouseDown"
                 MouseMove="OnMouseMove"
-                MouseLeftButtonUp="OnMouseUp"/>
-    </Grid>
+                MouseLeftButtonUp="OnMouseUp"
+                MouseWheel="OnMouseWheel">
+            <Canvas.Background>
+                <ImageBrush x:Name="brush" Stretch="Fill"/>
+            </Canvas.Background>
+        </Canvas>
+    </ScrollViewer>
 </UserControl>

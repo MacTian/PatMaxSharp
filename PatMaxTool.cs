@@ -49,7 +49,7 @@ public sealed class PatMaxTool
 
     // ---- scoring ----
     /// <summary>Minimum score to report a result as accepted.</summary>
-    public double AcceptThreshold { get; set; } = 0.5;
+    public double AcceptThreshold { get; set; } = 0.7;
 
     /// <summary>Minimum normalised contrast of the matched edges.</summary>
     public double ContrastThreshold { get; set; } = 0.08;
