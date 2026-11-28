@@ -423,7 +423,70 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public double ThroughputMpxs { get; private set; }
 
     /// <summary>Currently selected result (highlights the marker on the image).</summary>
-    public MatchResult SelectedResult { get; set; }
+    private MatchResult _selectedResult;
+
+    /// <summary>
+    /// Row selected in the results grid. When the row came from a batch run it also loads that
+    /// image and shows its pose, so the list doubles as a review tool.
+    /// </summary>
+    public MatchResult SelectedResult
+    {
+        get => _selectedResult;
+        set
+        {
+            if (!Set(ref _selectedResult, value)) return;
+            InspectSelectedResult();
+        }
+    }
+
+    /// <summary>Folder of the last batch run (used to resolve a row back to its image file).</summary>
+    public string LastBatchFolder { get; private set; } = "";
+
+    private void InspectSelectedResult()
+    {
+        var r = _selectedResult;
+        if (r == null || LastBatchFolder.Length == 0 || string.IsNullOrEmpty(r.ModelId)) return;
+
+        string path = System.IO.Path.Combine(LastBatchFolder, r.ModelId);
+        if (!System.IO.File.Exists(path)) return;
+
+        ShowImageWithoutClearing(path);
+        Markers = r.Score < 0.001
+            ? new List<MatchMarker>()
+            : new List<MatchMarker> { ToMarker(r) };
+        OnPropertyChanged(nameof(Markers));
+        ShowTrainRegion = false;
+
+        Status = r.Score < 0.001
+            ? $"{r.ModelId}  —  无结果"
+            : $"{r.ModelId}  得分 {r.Score:F3}  覆盖率 {r.Coverage:P0}  " +
+              $"位置 ({r.X:F1},{r.Y:F1})  角度 {r.AngleDegrees:F2}°  缩放 {r.Scale:F3}";
+    }
+
+    /// <summary>Swap the displayed image without touching the results list.</summary>
+    private void ShowImageWithoutClearing(string path)
+    {
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.UriSource = new Uri(path);
+        bmp.EndInit();
+        bmp.Freeze();
+        Image = bmp;
+        ImagePixelWidth = bmp.PixelWidth;
+        ImagePixelHeight = bmp.PixelHeight;
+    }
+
+    /// <summary>Result -> marker on the canvas.</summary>
+    private static MatchMarker ToMarker(MatchResult r) => new()
+    {
+        X = r.X, Y = r.Y,
+        AngleDeg = r.AngleDegrees,
+        Scale = r.Scale,
+        Score = r.Score,
+        Accepted = r.Accepted,
+        Size = Math.Max(12, Math.Sqrt(Math.Max(1, r.MatchedFeatures)) * 1.5)
+    };
     #endregion
 
     /// <summary>Set the status line from outside the view model (recording progress).</summary>
@@ -550,6 +613,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Trained = true;
 
             ApplyParameters();
+            LastBatchFolder = directory;
             LoadImageFile(files[0]);          // show the base image and its model
             Results.Clear();
 

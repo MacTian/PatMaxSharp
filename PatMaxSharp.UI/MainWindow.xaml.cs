@@ -60,8 +60,10 @@ public partial class MainWindow : Window
                 tputText.Text = $"{_vm.ThroughputMpxs:F2}";
             if (e.PropertyName == nameof(MainViewModel.SelectedResult))
             {
+                // In review mode the canvas shows exactly one marker (the selected row), so the
+                // highlighted marker is index 0 rather than the row index.
                 int idx = _vm.Results.IndexOf(_vm.SelectedResult);
-                viewer.SelectedIndex = idx;
+                viewer.SelectedIndex = (_vm.Markers?.Count ?? 0) == 1 ? 0 : idx;
                 resultsGrid.ScrollIntoView(_vm.SelectedResult);
             }
         };
