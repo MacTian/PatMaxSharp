@@ -33,7 +33,8 @@ public sealed class ParameterPreset
 
     // ---- Scoring parameters ----
     [JsonPropertyName("acceptThreshold")] public double AcceptThreshold { get; set; } = 0.7;
-    [JsonPropertyName("contrastThreshold")] public double ContrastThreshold { get; set; } = 0.1;
+    [JsonPropertyName("contrastThreshold")] public double ContrastThreshold { get; set; } = 0.08;
+    [JsonPropertyName("minPolarityCoherence")] public double MinPolarityCoherence { get; set; } = 0.75;
     [JsonPropertyName("grain")] public double Grain { get; set; } = 1.0;
     [JsonPropertyName("coarseGrainLimit")] public int CoarseGrainLimit { get; set; } = 10;
     [JsonPropertyName("fineGrainLimit")] public int FineGrainLimit { get; set; } = 5;
@@ -66,6 +67,7 @@ public sealed class ParameterPreset
             Description = $"{p.Description}。{p.Usage}",
             AcceptThreshold = p.AcceptThreshold,
             ContrastThreshold = p.ContrastThreshold,
+            MinPolarityCoherence = p.MinPolarityCoherence > 0 ? p.MinPolarityCoherence : 0.75,
             ScoreUsingClutter = p.ScoreUsingClutter,
             RotationAngleMin = p.RotationAngleMin,
             RotationAngleMax = p.RotationAngleMax,

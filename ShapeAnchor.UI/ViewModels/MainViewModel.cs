@@ -95,6 +95,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         TimeoutMs = p.TimeoutMs;
         AcceptThreshold = p.AcceptThreshold;
         ContrastThreshold = p.ContrastThreshold;
+        MinPolarityCoherence = p.MinPolarityCoherence;
         Grain = p.Grain;
         CoarseGrainLimit = p.CoarseGrainLimit;
         FineGrainLimit = p.FineGrainLimit;
@@ -190,7 +191,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     /// <summary>Compact summary of the settings that decide a match, shown in the status bar.</summary>
     public string ParamsSummary =>
-        $"接受阈值 {AcceptThreshold:F2}   角度 {RotationAngleMin:F0}…{RotationAngleMax:F0}°   " +
+        $"一致性 {MinPolarityCoherence:F2}   接受阈值 {AcceptThreshold:F2}   角度 {RotationAngleMin:F0}…{RotationAngleMax:F0}°   " +
         $"缩放 {ScaleMin:F2}…{ScaleMax:F2}   最大结果 {MaxResults}   " +
         $"{ (ScoreUsingClutter ? "杂波计分开" : "杂波计分关") }";
 
@@ -425,6 +426,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _AcceptThreshold;
         set { if (Set(ref _AcceptThreshold, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
+    private double _MinPolarityCoherence = 0.75;
+    /// <summary>
+    /// Polarity coherence gate (0..1): share of matched features whose edge points the way the
+    /// model normal does. A real instance reads ~1.0, a pose that only shares edge density ~0.5.
+    /// </summary>
+    public double MinPolarityCoherence
+    {
+        get => _MinPolarityCoherence;
+        set { if (Set(ref _MinPolarityCoherence, value)) OnPropertyChanged(nameof(ParamsSummary)); }
+    }
+
     private double _ContrastThreshold = 0.1;
     public double ContrastThreshold
     {
@@ -843,6 +855,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _tool.ClusterRadius = ClusterRadius;
         _tool.PreSmoothSigma = PreSmoothSigma;
         _tool.AcceptThreshold = AcceptThreshold;
+        _tool.MinPolarityCoherence = MinPolarityCoherence;
         _tool.ContrastThreshold = ContrastThreshold;
         _tool.RotationAngleMin = RotationAngleMin;
         _tool.RotationAngleMax = RotationAngleMax;
@@ -882,6 +895,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _tool.ClusterRadius = ClusterRadius;
             _tool.PreSmoothSigma = PreSmoothSigma;
             _tool.AcceptThreshold = AcceptThreshold;
+        _tool.MinPolarityCoherence = MinPolarityCoherence;
             _tool.ContrastThreshold = ContrastThreshold;
             _tool.RotationAngleMin = RotationAngleMin;
             _tool.RotationAngleMax = RotationAngleMax;

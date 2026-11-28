@@ -489,6 +489,10 @@
                             <TextBlock Text="{Binding AcceptThreshold, StringFormat='接受阈值：{0:F2}'}" Style="{StaticResource lbl}"/>
                             <Slider Minimum="0" Maximum="1" Value="{Binding AcceptThreshold}" TickFrequency="0.01"/>
                             <TextBlock Style="{StaticResource hint}" Text="0.7 为生产建议值：低于它的结果不会出现在表格里。"/>
+                            <TextBlock Text="{Binding MinPolarityCoherence, StringFormat='极性一致性门：{0:F2}'}" Style="{StaticResource lbl}"/>
+                            <Slider Minimum="0" Maximum="1" Value="{Binding MinPolarityCoherence}" TickFrequency="0.05"/>
+                            <TextBlock Style="{StaticResource hint}"
+                                       Text="真实实例≈1.00，边缘密度相似的伪解≈0.5；忽略极性时建议 0.75。"/>
                             <TextBlock Text="{Binding ContrastThreshold, StringFormat='对比度阈值：{0:F2}'}" Style="{StaticResource lbl}"/>
                             <Slider Minimum="0" Maximum="1" Value="{Binding ContrastThreshold}" TickFrequency="0.01"/>
                             <CheckBox Content="杂波计入评分 ScoreUsingClutter" IsChecked="{Binding ScoreUsingClutter}"/>

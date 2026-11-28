@@ -129,7 +129,7 @@ public sealed class ShapeAnchorTool
 
     // ---- training ----
     /// <summary>Upper bound on the number of features stored in a trained model.</summary>
-    public int TrainMaxFeatures { get; set; } = 600;
+    public int TrainMaxFeatures { get; set; } = 120;
 
     /// <summary>Minimum distance between two stored features, pixels.</summary>
     public double TrainMinSpacing { get; set; } = 2.0;
@@ -139,6 +139,13 @@ public sealed class ShapeAnchorTool
 
     /// <summary>Ignore edge polarity when training (CogPMAlignPattern.IgnorePolarity).</summary>
     public bool IgnorePolarity { get; set; }
+
+    /// <summary>
+    /// Training-side edge floor as a fraction of the strongest edge in the region (0..0.95).
+    /// Higher values keep only the strong geometric edges and drop shading gradients, which is what
+    /// makes a model survive a change of illumination. Maps to TrainOptions.ContrastThreshold.
+    /// </summary>
+    public double TrainFeatureFloor { get; set; } = 0.08;
 
     /// <summary>Polarity coherence gate; raised to 0.7 automatically for polarity-agnostic models.</summary>
     public double MinPolarityCoherence { get; set; } = -1;   // -1 = auto
@@ -193,7 +200,7 @@ public sealed class ShapeAnchorTool
         {
             MaxFeatures = TrainMaxFeatures,
             MinSpacing = TrainMinSpacing,
-            ContrastThreshold = TrainContrastThreshold,
+            ContrastThreshold = TrainFeatureFloor,
             Grain = grain,
             NoiseFloor = NoiseFloor,
             N = ScoreExponentN,
@@ -312,7 +319,7 @@ public sealed class ShapeAnchorTool
         // Ignoring polarity must not mean "anything with edges is fine": an instance whose
         // contrast is inverted is still coherent (~1.0), a wrong pose is not (~0.5).
         MinPolarityCoherence = Pattern != null && Pattern.PolarityAgnostic && MinPolarityCoherence < 0
-            ? 0.7
+            ? 0.75
             : Math.Max(0.0, MinPolarityCoherence),
         UseClutter = UseClutter,
         NormalizedCorrelation = NormalizedCorrelation,

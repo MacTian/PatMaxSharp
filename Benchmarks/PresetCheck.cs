@@ -12,6 +12,11 @@ namespace ShapeAnchor.Benchmarks;
 public static class PresetCheck
 {
     /// <summary>Build a tool from a preset; acceptAll keeps hypotheses the gates would drop.</summary>
+    /// <summary>Command-line override for the training feature floor (experiments).</summary>
+    public static double? TrainFloorOverride;
+    public static int? MaxFeaturesOverride;
+    public static double? CoherenceOverride;
+
     private static ShapeAnchorTool MakeTool(SearchPreset preset, bool acceptAll)
     {
         return new ShapeAnchorTool
@@ -34,9 +39,11 @@ public static class PresetCheck
             IgnorePolarity = preset.IgnorePolarity,
             AutoEdgeThreshold = preset.AutoEdgeThreshold,
             EdgeThreshold = preset.EdgeThreshold,
-            TrainMaxFeatures = preset.TrainMaxFeatures,
+            TrainMaxFeatures = MaxFeaturesOverride ?? preset.TrainMaxFeatures,
             TrainMinSpacing = preset.TrainMinSpacing,
-            MinPolarityCoherence = acceptAll ? 0.0 : preset.MinPolarityCoherence   // -1 = auto
+            TrainFeatureFloor = TrainFloorOverride ?? preset.TrainFeatureFloor,
+            MinPolarityCoherence = acceptAll ? 0.0
+                : (CoherenceOverride ?? preset.MinPolarityCoherence)   // -1 = auto
         };
     }
 

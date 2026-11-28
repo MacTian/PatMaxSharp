@@ -32,7 +32,10 @@ public sealed class SearchPreset
     public bool AutoEdgeThreshold { get; set; } = true;
     public double EdgeThreshold { get; set; } = 8.0;
     public double Grain { get; set; } = 1.0;
-    public int TrainMaxFeatures { get; set; } = 600;
+    /// <summary>Training edge floor as a fraction of the strongest edge (0.08 = permissive).</summary>
+    public double TrainFeatureFloor { get; set; } = 0.08;
+
+    public int TrainMaxFeatures { get; set; } = 120;
     public double TrainMinSpacing { get; set; } = 2.0;
 
     // performance
@@ -65,7 +68,7 @@ public static class PresetCatalog
             RotationAngleMin = -180, RotationAngleMax = 180,
             ScaleMin = 1.0, ScaleMax = 1.0,
             ApproximateNumberToFind = 1, MaxResults = 10,
-            TrainMaxFeatures = 600, TrainMinSpacing = 2.0,
+            TrainMaxFeatures = 120, TrainMinSpacing = 2.0,
             PrecisionStep = 2, SubpixelRefinement = true,
             IgnorePolarity = false, AutoEdgeThreshold = true, EdgeThreshold = 8.0
         },
@@ -78,7 +81,7 @@ public static class PresetCatalog
             RotationAngleMin = -10, RotationAngleMax = 10,
             ScaleMin = 1.0, ScaleMax = 1.0,
             PrecisionStep = 2, SubpixelRefinement = true,
-            TrainMaxFeatures = 600, TrainMinSpacing = 2.0
+            TrainMaxFeatures = 120, TrainMinSpacing = 2.0
         },
         new()
         {
@@ -89,7 +92,7 @@ public static class PresetCatalog
             RotationAngleMin = -30, RotationAngleMax = 30,
             ScaleMin = 0.95, ScaleMax = 1.05,
             PrecisionStep = 1, SubpixelRefinement = true,
-            TrainMaxFeatures = 1200, TrainMinSpacing = 1.5,
+            TrainMaxFeatures = 250, TrainMinSpacing = 1.5,
             MaxCandidates = 28
         },
         new()
@@ -150,7 +153,7 @@ public static class PresetCatalog
             XYOverlap = 0.8,
             IgnorePolarity = true,
             AutoEdgeThreshold = true, EdgeThreshold = 5.0,
-            TrainMaxFeatures = 600, TrainMinSpacing = 2.0,
+            TrainMaxFeatures = 120, TrainMinSpacing = 2.0,
             PrecisionStep = 2, SubpixelRefinement = true,
             EnableClustering = true, ClusterRadius = 8.0,
             MaxCandidates = 24,
@@ -171,7 +174,7 @@ public static class PresetCatalog
             XYOverlap = 0.8,
             IgnorePolarity = true,
             AutoEdgeThreshold = true, EdgeThreshold = 5.0,
-            TrainMaxFeatures = 600, TrainMinSpacing = 2.0,
+            TrainMaxFeatures = 120, TrainMinSpacing = 2.0,
             PrecisionStep = 2, SubpixelRefinement = true,
             EnableClustering = true, ClusterRadius = 8.0,
             MaxCandidates = 24,

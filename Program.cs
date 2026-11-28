@@ -40,6 +40,12 @@ if (presetIndex >= 0 && presetIndex + 1 < args.Length)
         PresetCheck.List();
         return 0;
     }
+    int tf = Array.FindIndex(args, a => a.Equals("--train-floor", StringComparison.OrdinalIgnoreCase));
+    if (tf > 0 && tf + 1 < args.Length) PresetCheck.TrainFloorOverride = double.Parse(args[tf + 1]);
+    int mf = Array.FindIndex(args, a => a.Equals("--max-features", StringComparison.OrdinalIgnoreCase));
+    if (mf > 0 && mf + 1 < args.Length) PresetCheck.MaxFeaturesOverride = int.Parse(args[mf + 1]);
+    int co = Array.FindIndex(args, a => a.Equals("--coherence", StringComparison.OrdinalIgnoreCase));
+    if (co > 0 && co + 1 < args.Length) PresetCheck.CoherenceOverride = double.Parse(args[co + 1]);
     PresetCheck.Run(args[presetIndex + 1],
         args.Any(a => a.Equals("--detail", StringComparison.OrdinalIgnoreCase)));
     return 0;

@@ -239,10 +239,19 @@ line read the same table, so every number below can be reproduced with
 
 What the numbers say:
 
-- **The two demo-aligned presets show that recall is not correctness.** The raw parameters
-  (scale 0.6–1.6) find all 17, but 10 of those solutions sit exactly on the scale lower bound of
-  0.60 — a shrunken copy of the model. Narrowing the window to 0.9–1.1 keeps all 17 while the
-  scales spread over 0.90–1.10; pick that one when the poses have to be usable.
+- **Two corrections that came out of measuring the challenge set (2026-11):**
+  1. **Model features went from 600 to 120.** The 600 strongest edges included many weak interior
+     gradients that flip with the illumination, polluting both the score and the coherence measure.
+     Keeping the 120 strongest (outline, holes, ribs) leaves the synthetic gate unchanged (10/10,
+     position error 0.026 px, angle 0.054°) while the default preset goes from 10 to 13 of 17.
+  2. **A polarity-coherence gate (default 0.75).** Polarity-agnostic matching uses |d| and so throws
+     away which way the edge points, which lets a pose that merely shares edge density score well.
+     Measured: real instances 1.00, wrong poses ~0.5. It is now a metric, a coarse-ranking weight and
+     an acceptance gate. Recall against gate value (demo-aligned raw, 17 frames): 0.70 → 16 frames
+     (mean 0.979), 0.75 → 12 (0.996), 0.85 → 10 (0.999). 0.75 is the default: fewer answers, none wrong.
+- The demo-aligned presets previously reported 17/17, twelve of which were geometrically wrong poses
+  (coherence 0.5). After both corrections: raw 12/17 (mean 0.996), tight-scale 14/17 (0.982). Recall
+  fell because wrong answers were removed, not because parts disappeared.
 - The default preset holds up on both sets: 11/12 on standard parts, 10/17 on the challenge set (the
   seven misses are frames with no usable edges, or parts clipped/occluded).
 - **Small-angle fast really does reject out-of-window frames.** This used to be a bug: refinement
