@@ -484,9 +484,9 @@
                                 <Slider Minimum="1" Maximum="60" Value="{Binding EdgeThreshold}" TickFrequency="1"/>
                                 <TextBlock Text="{Binding Grain, StringFormat='粒度 Grain：{0:F1}'}" Style="{StaticResource lbl}"/>
                                 <Slider Minimum="1" Maximum="10" Value="{Binding Grain}" TickFrequency="0.5"/>
-                                <TextBlock Text="{Binding TrainMaxFeatures, StringFormat='特征数上限：{0}（越小越抗光照变化）'}"
+                                <TextBlock Text="{Binding TrainMaxFeatures, StringFormat='特征数上限：{0}（120 起步；越大越慢、越易受光照影响）'}"
                                            Style="{StaticResource lbl}"/>
-                                <Slider Minimum="40" Maximum="600" Value="{Binding TrainMaxFeatures}" TickFrequency="10"/>
+                                <Slider Minimum="40" Maximum="2000" Value="{Binding TrainMaxFeatures}" TickFrequency="20"/>
                             </StackPanel>
                         </Expander>
 

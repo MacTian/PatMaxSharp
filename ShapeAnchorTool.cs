@@ -231,8 +231,11 @@ public sealed class ShapeAnchorTool
             N = ScoreExponentN,
             IgnorePolarity = IgnorePolarity
         };
+        // Auto spacing follows the grain, and tightens when more features are requested: the
+        // occupancy grid cannot place more points than the edge length allows, so a high cap with
+        // a coarse spacing would silently return the same model as a low cap.
         LastEffectiveSpacing = TrainMinSpacingAuto
-            ? Math.Clamp(2.0 * grain, 1.0, 6.0)
+            ? Math.Clamp(2.0 * grain * Math.Sqrt(120.0 / Math.Max(1, TrainMaxFeatures)), 1.0, 6.0)
             : Math.Max(1.0, TrainMinSpacing);
         opt.MinSpacing = LastEffectiveSpacing;
         Pattern = PatternTrainer.Train(image, roi, originX, originY, EdgeDetector, opt, TrainMask);
