@@ -537,6 +537,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>score = coverage^(1/N). Smaller N is stricter about partial matches.</summary>
     public double ScoreExponentN { get => _ScoreExponentN; set => Set(ref _ScoreExponentN, value); }
 
+    private bool _TrainMinSpacingAuto = true;
+    /// <summary>Let the grain decide the feature spacing (PatMax has no spacing parameter).</summary>
+    public bool TrainMinSpacingAuto
+    {
+        get => _TrainMinSpacingAuto;
+        set { if (Set(ref _TrainMinSpacingAuto, value)) OnPropertyChanged(nameof(SpacingSummary)); }
+    }
+
+    /// <summary>What the trainer will actually use, shown next to the switch.</summary>
+    public string SpacingSummary => TrainMinSpacingAuto
+        ? $"自动：{Math.Clamp(2.0 * Grain, 1.0, 6.0):F1} px（= 2 × 粒度）"
+        : $"手动：{TrainMinSpacing:F1} px";
+
     private double _TrainFeatureFloor = 0.08;
     /// <summary>Training edge floor as a fraction of the strongest edge in the region.</summary>
     public double TrainFeatureFloor { get => _TrainFeatureFloor; set => Set(ref _TrainFeatureFloor, value); }
@@ -782,7 +795,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
             Trained = true;
             Status = $"训练完成: {pattern.FeatureCount} 特征, W={pattern.W:F2}, " +
-                     $"原点 {OriginText}, 边缘阈值={_tool.EdgeDetector.LastEffectiveFloor:F1}" +
+                     $"原点 {OriginText}, 间距={_tool.LastEffectiveSpacing:F1}px, " +
+            $"边缘阈值={_tool.EdgeDetector.LastEffectiveFloor:F1}" +
                      $"{(_tool.Pattern.PolarityAgnostic ? ", 无极性" : "")}";
             Results.Clear();
         }
@@ -1011,6 +1025,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _tool.TrainMaxFeatures = Math.Max(20, TrainMaxFeatures);
         _tool.TrainMinSpacing = Math.Max(1.0, TrainMinSpacing);
         _tool.TrainFeatureFloor = Math.Clamp(TrainFeatureFloor, 0.0, 0.9);
+        _tool.TrainMinSpacingAuto = TrainMinSpacingAuto;
         _tool.TrainMask = CropMaskForTrain();
         return _tool.Train(image, roi, originX, originY, Grain);
     }

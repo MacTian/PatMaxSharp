@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:ShapeAnchor.Controls;assembly=ShapeAnchor.Controls"
+        xmlns:local="clr-namespace:ShapeAnchor.UI"
         Title="ShapeAnchor — 几何特征匹配引擎" Height="900" Width="1440"
         WindowStartupLocation="CenterScreen"
         Background="#1B1B1D" Foreground="#E8E8E8"
@@ -22,6 +23,7 @@
         <SolidColorBrush x:Key="BSub"     Color="#A8A8B0"/>
         <SolidColorBrush x:Key="BAccent"  Color="#4FC3F7"/>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <local:InverseBooleanConverter x:Key="InverseBool"/>
 
         <!-- text -->
         <Style TargetType="TextBlock">
@@ -536,9 +538,13 @@
                                 <TextBlock Text="{Binding TrainFeatureFloor, StringFormat='训练边缘门限：{0:F2}（占最强边比例）'}"
                                            Style="{StaticResource lbl}"/>
                                 <Slider Minimum="0" Maximum="0.6" Value="{Binding TrainFeatureFloor}" TickFrequency="0.02"/>
-                                <TextBlock Text="{Binding TrainMinSpacing, StringFormat='特征最小间距：{0:F1} px'}"
+                                <CheckBox Content="特征间距自动（跟随粒度）" IsChecked="{Binding TrainMinSpacingAuto}"
+                                          ToolTip="PatMax 没有间距参数，特征密度由 GrainLimitFine/Coarse 决定；自动即 2×粒度"/>
+                                <TextBlock Text="{Binding SpacingSummary}" Style="{StaticResource value}"/>
+                                <TextBlock Text="{Binding TrainMinSpacing, StringFormat='手动间距：{0:F1} px'}"
                                            Style="{StaticResource lbl}"/>
-                                <Slider Minimum="1" Maximum="8" Value="{Binding TrainMinSpacing}" TickFrequency="0.5"/>
+                                <Slider Minimum="1" Maximum="8" Value="{Binding TrainMinSpacing}" TickFrequency="0.5"
+                                        IsEnabled="{Binding TrainMinSpacingAuto, Converter={StaticResource InverseBool}}"/>
                                 <TextBlock Text="{Binding ClusterRadius, StringFormat='聚类半径：{0:F0} px'}" Style="{StaticResource lbl}"/>
                                 <Slider Minimum="2" Maximum="40" Value="{Binding ClusterRadius}" TickFrequency="2"/>
                                 <TextBlock Text="{Binding PreSmoothSigma, StringFormat='高斯预平滑 σ：{0:F1}'}" Style="{StaticResource lbl}"/>

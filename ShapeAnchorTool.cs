@@ -155,6 +155,17 @@ public sealed class ShapeAnchorTool
     public ShapeAnchor.Matching.MaskScoringMethod MaskScoring { get; set; }
 
     /// <summary>
+    /// Derive the feature spacing from the grain instead of taking TrainMinSpacing literally.
+    /// PatMax has no spacing parameter at all: feature density follows GrainLimitFine/Coarse, and
+    /// GrainLimitAutoSelect is on by default, so tying the spacing to the grain is the same idea.
+    /// Rule: 2 x grain, clamped to 1..6 px.
+    /// </summary>
+    public bool TrainMinSpacingAuto { get; set; } = true;
+
+    /// <summary>Spacing actually used for the last training run.</summary>
+    public double LastEffectiveSpacing { get; private set; } = 2.0;
+
+    /// <summary>
     /// Training-side edge floor as a fraction of the strongest edge in the region (0..0.95).
     /// Higher values keep only the strong geometric edges and drop shading gradients, which is what
     /// makes a model survive a change of illumination. Maps to TrainOptions.ContrastThreshold.
@@ -220,6 +231,10 @@ public sealed class ShapeAnchorTool
             N = ScoreExponentN,
             IgnorePolarity = IgnorePolarity
         };
+        LastEffectiveSpacing = TrainMinSpacingAuto
+            ? Math.Clamp(2.0 * grain, 1.0, 6.0)
+            : Math.Max(1.0, TrainMinSpacing);
+        opt.MinSpacing = LastEffectiveSpacing;
         Pattern = PatternTrainer.Train(image, roi, originX, originY, EdgeDetector, opt, TrainMask);
         return Pattern;
     }

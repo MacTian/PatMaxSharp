@@ -201,6 +201,8 @@
 
 ### 9.2 与 Cognex 原版对应
 
+> 逐项对照（含"我们独有"与"尚未实现"）见 `docs/params-mapping.md`。
+
 原版默认值读自本机安装的 `Cognex.VisionPro.PMAlign.dll` 的 ECMA-335 元数据与 `[DefaultValue]` 属性，取证记录见 `docs/evidence/params-reference.md`。
 
 | 本实现 | 原版（`Cognex.VisionPro.PMAlign`） | 关系 |
