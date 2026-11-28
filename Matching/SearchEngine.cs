@@ -181,8 +181,11 @@ public sealed class SearchEngine
         // Six samples were too coarse: with a 0.6-1.6 window the grid was 0.6/0.8/1.0/1.2/1.4/1.6,
         // so a part at 1.51 was never tested and only its wrong-looking neighbours were refined.
         // The scale stage is cheap next to the angle sweep, so sample every ~5% instead.
-        const int maxScales = 14;
-        double step = Math.Max(0.05, (hi - lo) / (maxScales - 1));
+        // A coarse grid coarser than ~4% makes the reported scale depend on where the window
+        // happens to place its samples: 0.6-1.7 stepped 8.5% and a part at 0.993 landed between
+        // two samples. Cap the step instead of the count, up to a sane ceiling.
+        int maxScales = Math.Clamp((int)Math.Ceiling((hi - lo) / 0.04) + 1, 6, 32);
+        double step = Math.Max(0.04, (hi - lo) / (maxScales - 1));
         for (double s = lo; s <= hi + 1e-9; s += step) list.Add(s);
         if (list.Count == 0) list.Add(1.0);
         return list;

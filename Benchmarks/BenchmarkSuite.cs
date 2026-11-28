@@ -32,6 +32,9 @@ public static class BenchmarkSuite
             ContrastThreshold = 0.05,
             TrainMaxFeatures = 500,
             TrainMinSpacing = 2.0,
+            // This is a regression fixture: pin the spacing instead of letting the grain/count
+            // heuristic move it, otherwise the calibration drifts whenever the heuristic changes.
+            TrainMinSpacingAuto = false,
             CoarseFeatureCount = 32,
             MidFeatureCount = 96,
             MaxCandidates = 20,
