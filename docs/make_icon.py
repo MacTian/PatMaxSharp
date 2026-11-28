@@ -1,4 +1,4 @@
-"""Draw the PatMaxSharp icon.
+"""Draw the ShapeAnchor icon.
 
 The motif is a machine-vision fiducial: four corner brackets (the search region), a ring and a
 crosshair (the located feature), and a solid centre mark (the pattern origin). Everything is
