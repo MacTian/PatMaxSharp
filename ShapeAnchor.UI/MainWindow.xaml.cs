@@ -60,11 +60,12 @@ public partial class MainWindow : Window
                 tputText.Text = $"{_vm.ThroughputMpxs:F2}";
             if (e.PropertyName == nameof(MainViewModel.SelectedResult))
             {
-                // In review mode the canvas shows exactly one marker (the selected row), so the
-                // highlighted marker is index 0 rather than the row index.
-                int idx = _vm.Results.IndexOf(_vm.SelectedResult);
+                // The selection can be cleared (empty grid area, 清空, a new run), in which case
+                // SelectedResult is null and ScrollIntoView would throw ArgumentNullException.
+                var selected = _vm.SelectedResult;
+                int idx = selected == null ? -1 : _vm.Results.IndexOf(selected);
                 viewer.SelectedIndex = (_vm.Markers?.Count ?? 0) == 1 ? 0 : idx;
-                resultsGrid.ScrollIntoView(_vm.SelectedResult);
+                if (selected != null) resultsGrid.ScrollIntoView(selected);
             }
         };
     }
