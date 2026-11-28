@@ -208,6 +208,8 @@ line read the same table, so every number below can be reproduced with
 | Reflection / silhouette | contrast polarity flips | `IgnorePolarity`, threshold raised to 0.80 (0.65 accepted confidently wrong poses) |
 | Dark / low contrast | underexposed frames | automatic edge threshold, floor 4, threshold 0.60 |
 | Multi-target | several parts per frame | expect 5, up to 20 results, XY overlap 0.3, threshold 0.60 |
+| Demo-aligned (raw) | reproduce the VisionPro PatMax_Demo recall | ignore polarity, ±45°, scale **0.6–1.6**, accept 0.5, contrast 0, XY overlap 0.8, auto edge 5, timeout 5 s, find 3 |
+| Demo-aligned (tight scale) | same recall, usable poses | scale narrowed to **0.9–1.1**, everything else identical |
 
 `D:\FTP\calibration` (12 standard parts, all expected at ≥0.9):
 
@@ -232,9 +234,15 @@ line read the same table, so every number below can be reproduced with
 | Reflection / silhouette | 12/17 | 0.939 | 4 |
 | Dark / low contrast | 13/17 | 0.884 | 2 |
 | Multi-target | 11/17 | 0.932 | 2 |
+| Demo-aligned (raw) | **17/17** | 0.981 | 3 |
+| Demo-aligned (tight scale) | **17/17** | 0.969 | 3 |
 
 What the numbers say:
 
+- **The two demo-aligned presets show that recall is not correctness.** The raw parameters
+  (scale 0.6–1.6) find all 17, but 10 of those solutions sit exactly on the scale lower bound of
+  0.60 — a shrunken copy of the model. Narrowing the window to 0.9–1.1 keeps all 17 while the
+  scales spread over 0.90–1.10; pick that one when the poses have to be usable.
 - The default preset holds up on both sets: 11/12 on standard parts, 10/17 on the challenge set (the
   seven misses are frames with no usable edges, or parts clipped/occluded).
 - **Small-angle fast really does reject out-of-window frames.** This used to be a bug: refinement

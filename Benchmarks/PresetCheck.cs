@@ -92,7 +92,7 @@ public static class PresetCheck
     {
         if (!Directory.Exists(directory)) { Console.WriteLine($"[preset] directory not found: {directory}"); return; }
 
-        var perImage = new List<(SearchPreset preset, List<(string file, double score, double angle, int count)> rows)>();
+        var perImage = new List<(SearchPreset preset, List<(string file, double score, double angle, double scale, int count)> rows)>();
         var files = ImageLoader.Enumerate(directory);
         if (files.Count < 2) { Console.WriteLine("[preset] need at least two images"); return; }
 
@@ -137,7 +137,7 @@ public static class PresetCheck
 
             int found = 0, strong = 0, mid = 0, weak = 0, maxInstances = 0;
             double scoreSum = 0;
-            var detailRows = new List<(string file, double score, double angle, int count)>();
+            var detailRows = new List<(string file, double score, double angle, double scale, int count)>();
             var watch = Stopwatch.StartNew();
 
             foreach (var file in files)
@@ -148,6 +148,7 @@ public static class PresetCheck
                 detailRows.Add((Path.GetFileName(file),
                                 results.Count > 0 ? results[0].Score : 0,
                                 results.Count > 0 ? results[0].AngleDegrees : 0,
+                                results.Count > 0 ? results[0].Scale : 0,
                                 results.Count));
                 if (results.Count > 0)
                 {
@@ -166,6 +167,13 @@ public static class PresetCheck
                               $"{(found > 0 ? scoreSum / found : 0),6:F3} {maxInstances,5} " +
                               $"{trainWatch.Elapsed.TotalMilliseconds,6:F0}ms {(watch.Elapsed.TotalMilliseconds / files.Count),7:F1}ms");
 
+            var scaleHist = detailRows
+                .Where(r => r.count > 0)
+                .GroupBy(r => Math.Round(r.scale, 2))
+                .OrderBy(g => g.Key)
+                .Select(g => $"{g.Key:0.00}×{g.Count()}");
+            Console.WriteLine($"{"",-16} {"",33} scale: {string.Join("  ", scaleHist)}");
+
             if (detail) perImage.Add((preset, detailRows));
         }
 
@@ -174,13 +182,13 @@ public static class PresetCheck
             Console.WriteLine();
             Console.WriteLine("逐图明细（得分 / 角度 / 实例数）：");
             var header = "preset".PadRight(16) + string.Join("", files.Select(f =>
-                Path.GetFileName(f).Replace(".bmp", "").Replace(".png", "").PadLeft(9)));
+                Path.GetFileName(f).Replace(".bmp", "").Replace(".png", "").PadLeft(13)));
             Console.WriteLine(header);
             foreach (var (preset, rows) in perImage)
             {
                 var line = preset.Name.PadRight(16);
                 foreach (var r in rows)
-                    line += (r.count > 0 ? $"{r.score:F2}@{r.angle,4:F0}" : "   —    ").PadLeft(9);
+                    line += (r.count > 0 ? $"{r.score:F2}@{r.angle,4:F0}x{r.scale:F2}" : "   —    ").PadLeft(13);
                 Console.WriteLine(line);
             }
         }

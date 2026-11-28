@@ -130,9 +130,51 @@ public static class PresetCatalog
             ClusterRadius = 12,
             RotationAngleMin = -180, RotationAngleMax = 180,
             PrecisionStep = 2, SubpixelRefinement = true
+        },
+        new()
+        {
+            Name = "演示对齐·原始参数",
+            Description = "逐项对齐 VisionPro PatMax_Demo：忽略极性、角度 ±45°、缩放 0.6–1.6、"
+                        + "接受 0.5、对比度 0、XY 重叠 0.8、自动边缘阈值 5、超时 5000 ms、查找 3",
+            Usage = "17/17 全部找到，但 17 个解里有 10 个落在缩放下界 0.60（模型的缩小副本），"
+                  + "属于退化解——召回不等于位姿正确，务必核对叠加图。",
+            AcceptThreshold = 0.5,
+            ContrastThreshold = 0.0,
+            ScoreUsingClutter = false,
+            RotationAngleMin = -45, RotationAngleMax = 45,
+            ScaleMin = 0.6, ScaleMax = 1.6,
+            ApproximateNumberToFind = 3, MaxResults = 3,
+            XYOverlap = 0.8,
+            IgnorePolarity = true,
+            AutoEdgeThreshold = true, EdgeThreshold = 5.0,
+            TrainMaxFeatures = 600, TrainMinSpacing = 2.0,
+            PrecisionStep = 2, SubpixelRefinement = true,
+            EnableClustering = true, ClusterRadius = 8.0,
+            MaxCandidates = 24,
+            TimeoutMs = 5000
+        },
+        new()
+        {
+            Name = "演示对齐·尺度收紧",
+            Description = "同上，但缩放收到 0.9–1.1：同样 17/17，且解不再塌到缩放下界",
+            Usage = "在 17 张实拍图上既要全部找到、又要能用的位姿时选这一组；"
+                  + "它是演示参数在本数据集上的可用版本。",
+            AcceptThreshold = 0.5,
+            ContrastThreshold = 0.0,
+            ScoreUsingClutter = false,
+            RotationAngleMin = -45, RotationAngleMax = 45,
+            ScaleMin = 0.9, ScaleMax = 1.1,
+            ApproximateNumberToFind = 3, MaxResults = 3,
+            XYOverlap = 0.8,
+            IgnorePolarity = true,
+            AutoEdgeThreshold = true, EdgeThreshold = 5.0,
+            TrainMaxFeatures = 600, TrainMinSpacing = 2.0,
+            PrecisionStep = 2, SubpixelRefinement = true,
+            EnableClustering = true, ClusterRadius = 8.0,
+            MaxCandidates = 24,
+            TimeoutMs = 5000
         }
     };
-
     /// <summary>Look a preset up by name (case-insensitive, partial match allowed).</summary>
     public static SearchPreset Find(string name)
     {
