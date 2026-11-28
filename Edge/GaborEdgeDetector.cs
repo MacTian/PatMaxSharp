@@ -273,6 +273,17 @@ public sealed class GaborEdgeDetector
     //  Public entry points
     // ------------------------------------------------------------------
     /// <summary>
+    /// When true the mask threshold adapts to the image: a dark or low-contrast frame would
+    /// otherwise lose most of its real edges under a fixed absolute floor, which is exactly
+    /// how a badly underexposed part ends up matched at a wrong pose.
+    /// The automatic value only ever lowers the floor, never raises it above <see cref="NoiseFloor"/>.
+    /// </summary>
+    public bool AutoNoiseFloor { get; set; } = true;
+
+    /// <summary>Floor actually used by the last <see cref="Detect"/> call.</summary>
+    public double LastEffectiveFloor { get; private set; }
+
+    /// <summary>
     /// Produce the signed gradient field for one image (magnitude, edge mask, maximum and edge
     /// count are filled in as well).
     /// </summary>
@@ -289,23 +300,79 @@ public sealed class GaborEdgeDetector
         if (Method == EdgeMethod.GaborBank) DetectGabor(src, w, h, map);
         else DetectGoG(src, w, h, map);
 
-        // magnitude + noise mask
+        // magnitudes first: the automatic floor needs the distribution
         float max = 0f;
-        int edgeCount = 0;
-        float floor = (float)NoiseFloor;
         for (int i = 0; i < n; i++)
         {
             float gx = map.Gx[i], gy = map.Gy[i];
             float mag = (float)Math.Sqrt(gx * gx + gy * gy);
             map.Magnitude[i] = mag;
-            bool isEdge = mag > floor;
-            map.IsEdge[i] = isEdge;
-            if (isEdge) edgeCount++;
             if (mag > max) max = mag;
         }
+
+        float floor = (float)NoiseFloor;
+        if (AutoNoiseFloor && max > 0)
+        {
+            // Two estimators, because either one alone misjudges half the cases:
+            //  * 3x the median gradient (the classic Canny high threshold) tracks the noise
+            //    level, but a mostly-black frame with one bright part has a tiny median and
+            //    would drop the floor into compression noise;
+            //  * 10% of the 99th percentile tracks the *strongest* edges, so the floor only
+            //    comes down when even the strongest edges are weak - the signature of a genuinely
+            //    underexposed frame.
+            var (median, p99) = MagnitudePercentiles(map.Magnitude);
+            double auto = Math.Max(3.0 * median, 0.10 * p99);
+            floor = (float)Math.Clamp(auto, 1.5, NoiseFloor);
+        }
+        LastEffectiveFloor = floor;
+
+        int edgeCount = 0;
+        var isEdge = map.IsEdge;
+        var mags = map.Magnitude;
+        for (int i = 0; i < n; i++)
+        {
+            bool edge = mags[i] > floor;
+            isEdge[i] = edge;
+            if (edge) edgeCount++;
+        }
+
         map.MaxMagnitude = max;
         map.EdgePixelCount = edgeCount;
         return map;
+    }
+
+    /// <summary>Median and 99th-percentile gradient magnitude, from one 1024-bin histogram.</summary>
+    private static (double Median, double P99) MagnitudePercentiles(float[] magnitude)
+    {
+        const int bins = 1024;
+        float max = 0f;
+        for (int i = 0; i < magnitude.Length; i++) if (magnitude[i] > max) max = magnitude[i];
+        if (max <= 0) return (0, 0);
+
+        var histogram = new int[bins];
+        for (int i = 0; i < magnitude.Length; i++)
+        {
+            int b = (int)(magnitude[i] * (bins - 1) / max);
+            if (b < 0) b = 0; else if (b >= bins) b = bins - 1;
+            histogram[b]++;
+        }
+
+        int medianTarget = magnitude.Length / 2;
+        int p99Target = (int)(0.99 * magnitude.Length);
+        int running = 0;
+        double median = 0, p99 = 0;
+        bool haveMedian = false, haveP99 = false;
+
+        for (int b = 0; b < bins; b++)
+        {
+            running += histogram[b];
+            double value = b * (double)max / (bins - 1);
+            if (!haveMedian && running > medianTarget) { median = value; haveMedian = true; }
+            if (!haveP99 && running > p99Target) { p99 = value; haveP99 = true; }
+            if (haveMedian && haveP99) break;
+        }
+        if (!haveP99) p99 = max;
+        return (median, p99);
     }
 
     /// <summary>Separable derivative-of-Gaussian: two row passes, two column passes.</summary>

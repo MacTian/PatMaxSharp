@@ -111,6 +111,9 @@ public sealed class PatMaxTool
     /// <summary>Score includes unmodelled-edge clutter.</summary>
     public bool UseClutter { get; set; } = true;
 
+    /// <summary>Normalised (gain-invariant) correlation in the coarse stage; off by default (see SearchOptions).</summary>
+    public bool NormalizedCorrelation { get; set; }
+
     /// <summary>
     /// Wall-clock budget for one run, milliseconds, declared for API compatibility. It is
     /// copied into SearchOptions but the search engine does not consult it, so a run is not
@@ -268,6 +271,7 @@ public sealed class PatMaxTool
         OverlapSuppression = 0.55,
         MinSeparationPixels = EnableClustering ? Math.Max(0, ClusterRadius) : 0.0,
         UseClutter = UseClutter,
+        NormalizedCorrelation = NormalizedCorrelation,
         MaxLevels = MaxLevels,
         TimeoutMs = TimeoutMs
     };

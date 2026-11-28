@@ -83,6 +83,17 @@ public sealed class SearchOptions
     /// <summary>Include unmodelled-edge clutter in the score.</summary>
     public bool UseClutter { get; set; } = true;
 
+    /// <summary>
+    /// Divide the coarse correlation by the mean edge strength under the model footprint
+    /// (normalised correlation).
+    ///
+    /// OFF by default, on measurement: it fixes gain differences but it also depresses the
+    /// correct pose when structured clutter covers the whole footprint (a part behind plastic
+    /// bags scored 0.895 absolute and 0.562 normalised), because there the local energy is high
+    /// everywhere and the ratio stops discriminating. Kept as an option for pure gain changes.
+    /// </summary>
+    public bool NormalizedCorrelation { get; set; }
+
     /// <summary>Maximum pyramid levels (image is halved per level).</summary>
     public int MaxLevels { get; set; } = 4;
 

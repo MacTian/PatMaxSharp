@@ -111,7 +111,11 @@ public sealed class SearchEngine
             if (s >= preGate) pre.Add((h, s));
         }
 
-        pre.Sort((a, b) => b.Score.CompareTo(a.Score));
+        pre.Sort((a, b) =>
+        {
+            int c = b.Score.CompareTo(a.Score);
+            return c != 0 ? c : CompareHypotheses(a.H, b.H);
+        });
 
         // Keep hypotheses that are competitive with the best one (that is what a second
         // instance looks like) and drop the also-rans before paying for a pose fit.
@@ -209,6 +213,9 @@ public sealed class SearchEngine
         public int[] Iy = Array.Empty<int>();
         public float TotalWeight;
         public float MinX, MaxX, MinY, MaxY;
+
+        /// <summary>Compare |response| instead of the signed response (IgnorePolarity).</summary>
+        public bool Agnostic;
     }
 
     /// <summary>
@@ -266,6 +273,7 @@ public sealed class SearchEngine
 
         om.TotalWeight = (float)Math.Max(1e-6, totalWeight);
         om.MinX = minX; om.MaxX = maxX; om.MinY = minY; om.MaxY = maxY;
+        om.Agnostic = model.PolarityAgnostic;
         return om;
     }
 
@@ -274,7 +282,8 @@ public sealed class SearchEngine
     // ------------------------------------------------------------------
     /// <summary>Nearest-neighbour correlation surface (coarse stage: ~2x faster than bilinear).</summary>
     private static void ScoreSurfaceFast(EdgeMap map, OrientedModel om, int stride,
-        int loX, int hiX, int loY, int hiY, float invRef, double[] surface, int sw, out double maxValue)
+        int loX, int hiX, int loY, int hiY, float invRef, bool normalize,
+        double[] surface, int sw, out double maxValue)
     {
         var gx = map.Gx;
         var gy = map.Gy;
@@ -294,7 +303,8 @@ public sealed class SearchEngine
             for (int ix = 0; ix < cols; ix++)
             {
                 int cx = loX + ix * stride;
-                double acc = 0;
+                double acc = 0, energy = 0;
+                int inBounds = 0;
                 for (int f = 0; f < n; f++)
                 {
                     int px = cx + om.Ix[f];
@@ -302,9 +312,27 @@ public sealed class SearchEngine
                     if ((uint)px >= (uint)w || (uint)py >= (uint)h) continue;
                     int idx = py * w + px;
                     double d = gx[idx] * nx[f] + gy[idx] * ny[f];
+                    if (om.Agnostic) d = Math.Abs(d);
                     if (d > 0) acc += d * wt[f];
+                    energy += map.Magnitude[idx];
+                    inBounds++;
                 }
-                double s = acc * invWeight * invRef;
+
+                // Normalised correlation: divide by the mean edge strength under the footprint,
+                // so a busy, high-contrast clutter region cannot win by sheer edge density and a
+                // globally darker frame cannot lose by sheer gain. A perfect, polarity-correct
+                // match returns ~1.
+                double s;
+                if (normalize && inBounds > 0)
+                {
+                    // Gain-invariant variant, kept as an option. Measured on a 17-image factory
+                    // set it is a wash: it fixes a dim frame but breaks a part seen through
+                    // plastic bags, because there the local energy is high everywhere and the
+                    // ratio stops discriminating. So it is off by default.
+                    double localRef = energy / inBounds;
+                    s = acc * invWeight / Math.Max(localRef, 1e-3);
+                }
+                else s = acc * invWeight * invRef;
                 surface[row + ix] = s;
                 if (s > max) max = s;
             }
@@ -335,6 +363,7 @@ public sealed class SearchEngine
             double gyb = (gy[i0] * (1 - fx) + gy[i0 + 1] * fx) * (1 - fy) + (gy[i1] * (1 - fx) + gy[i1 + 1] * fx) * fy;
 
             double d = gxb * om.Nx[f] + gyb * om.Ny[f];
+            if (om.Agnostic) d = Math.Abs(d);
             if (d >= minResponse)
             {
                 matched++;
@@ -360,7 +389,8 @@ public sealed class SearchEngine
     {
         var gx = map.Gx; var gy = map.Gy;
         int w = map.Width, h = map.Height;
-        double acc = 0;
+        double acc = 0, energy = 0;
+        int inBounds = 0;
         int n = om.Count;
 
         for (int f = 0; f < n; f++)
@@ -375,9 +405,20 @@ public sealed class SearchEngine
             double gxb = (gx[i0] * (1 - fx) + gx[i0 + 1] * fx) * (1 - fy) + (gx[i1] * (1 - fx) + gx[i1 + 1] * fx) * fy;
             double gyb = (gy[i0] * (1 - fx) + gy[i0 + 1] * fx) * (1 - fy) + (gy[i1] * (1 - fx) + gy[i1 + 1] * fx) * fy;
 
-            double d = gxb * om.Nx[f] + gyb * om.Ny[f] - minResponse;
+            double d = gxb * om.Nx[f] + gyb * om.Ny[f];
+            if (om.Agnostic) d = Math.Abs(d);
+            d -= minResponse;
             if (d > 0) acc += om.W[f] * d;
+
+            energy += Math.Sqrt(gxb * gxb + gyb * gyb);
+            inBounds++;
         }
+
+        // The refinement stays on the absolute (gain-sensitive) score on purpose: normalising
+        // here makes a slightly mis-scaled model score as well as the right one, because the
+        // leftover energy of the wrong footprint is divided away. Normalisation belongs to the
+        // coarse candidate stage, which only has to decide *where* to look.
+        _ = energy; _ = inBounds;
         return acc * invRef / om.TotalWeight;
     }
 
@@ -455,6 +496,29 @@ public sealed class SearchEngine
         public double X, Y, Angle, Scale, Score;
     }
 
+    /// <summary>
+    /// Total order for hypotheses. Sorting on score alone leaves ties in whatever order the
+    /// parallel workers happened to finish, and the merge/prune steps downstream then pick a
+    /// different survivor on every run: the same image could score 0.895 or 0.562 depending on
+    /// thread timing. The tie-breakers make a run reproducible.
+    /// </summary>
+    private static int CompareHypotheses(Hypothesis a, Hypothesis b)
+    {
+        int c = b.Score.CompareTo(a.Score);
+        if (c != 0) return c;
+        // Prefer the smaller rotation on a tie: the search prior is "near nominal", and
+        // ordering by signed angle instead used to pick the most negative branch.
+        c = Math.Abs(a.Angle).CompareTo(Math.Abs(b.Angle));
+        if (c != 0) return c;
+        c = a.Angle.CompareTo(b.Angle);
+        if (c != 0) return c;
+        c = a.X.CompareTo(b.X);
+        if (c != 0) return c;
+        c = a.Y.CompareTo(b.Y);
+        if (c != 0) return c;
+        return a.Scale.CompareTo(b.Scale);
+    }
+
     private List<Hypothesis> CoarseStage(PatternModel model, SearchPyramid pyramid, int level,
         List<double> angles, List<double> scales, SearchOptions opt, SearchDiagnostics diag)
     {
@@ -485,7 +549,7 @@ public sealed class SearchEngine
             int sh = (hiY - loY) / stride + 1;
             var surface = new double[sw * sh];
 
-            ScoreSurfaceFast(map, om, stride, loX, hiX, loY, hiY, invRef, surface, sw, out double maxValue);
+            ScoreSurfaceFast(map, om, stride, loX, hiX, loY, hiY, invRef, opt.NormalizedCorrelation, surface, sw, out double maxValue);
             System.Threading.Interlocked.Add(ref scored, sw * sh);
             if (maxValue <= 1e-6) return;
 
@@ -529,28 +593,43 @@ public sealed class SearchEngine
         }
         if (list.Count == 0) list.AddRange(raw.Take(Math.Min(4, raw.Count)));
 
-        list.Sort((a, b) => b.Score.CompareTo(a.Score));
+        list.Sort(CompareHypotheses);
 
-        // Keep angular diversity: a coarse level sees a blurry, nearly rotationally
-        // symmetric shape, so the top scores can all come from one wrong angle branch.
-        // Spreading the survivors over angle buckets lets the full-resolution scoring
-        // decide between them.
-        var selected = new List<Hypothesis>();
+        // Two passes, because either rule alone fails on real data:
+        //  * a pure score cut can hand every slot to one wrong angle branch, since a coarse level
+        //    sees a blurry, nearly rotationally symmetric shape;
+        //  * a pure per-bucket quota can silently drop the strongest candidate once its bucket is
+        //    full, which is how a well-centred instance used to be lost.
+        // So the strongest half always goes through, and bucket diversity fills the rest.
+        int budget = Math.Max(1, opt.MaxCandidates);
+        int guaranteed = Math.Max(1, budget / 2);
+
+        var selected = new List<Hypothesis>(budget);
+        var seen = new HashSet<int>();
+        for (int i = 0; i < list.Count && selected.Count < guaranteed; i++)
+        {
+            selected.Add(list[i]);
+            seen.Add(i);
+        }
+
         var perBucket = new Dictionary<int, int>();
         int buckets = 24;
-        foreach (var h in list)
+        for (int i = 0; i < list.Count && selected.Count < budget; i++)
         {
+            if (seen.Contains(i)) continue;
+            var h = list[i];
             int bucket = (int)Math.Round((h.Angle * 180 / Math.PI + 360) % 360 / (360.0 / buckets)) % buckets;
             perBucket.TryGetValue(bucket, out int n);
             if (n >= 2) continue;
             perBucket[bucket] = n + 1;
             selected.Add(h);
-            if (selected.Count >= Math.Max(1, opt.MaxCandidates)) break;
         }
-        for (int i = 0; selected.Count < Math.Min(opt.MaxCandidates, list.Count) && i < list.Count; i++)
-            if (!selected.Contains(list[i])) selected.Add(list[i]);
 
-        selected.Sort((a, b) => b.Score.CompareTo(a.Score));
+        // still short of budget: fill from the score order
+        for (int i = 0; i < list.Count && selected.Count < budget; i++)
+            if (!seen.Contains(i)) selected.Add(list[i]);
+
+        selected.Sort(CompareHypotheses);
         diag.CoarseCandidates = selected.Count;
         return selected;
     }
@@ -629,7 +708,7 @@ public sealed class SearchEngine
                 });
         });
 
-        outp.Sort((a, b) => b.Score.CompareTo(a.Score));
+        outp.Sort(CompareHypotheses);
 
         // Spatially distinct hypotheses must survive: without this, several instances of
         // the same pattern collapse into the single best peak and only one is reported.
@@ -743,6 +822,12 @@ public sealed class SearchEngine
     {
         if (model.Count < 6) return null;
 
+        bool agnostic = model.PolarityAgnostic;
+
+        // In polarity-agnostic mode the response magnitude is what matters, so the sign test
+        // becomes an absolute value; otherwise the feature polarity selects the direction.
+        double Respond(double value, double polarity) => agnostic ? Math.Abs(value) : polarity * value;
+
         double radius = Math.Max(0.5, opt.NormalSearchRadius);
         double step = Math.Clamp(opt.NormalSearchStep, 0.1, 1.0);
         int taps = (int)Math.Round(2 * radius / step) + 1;
@@ -786,7 +871,7 @@ public sealed class SearchEngine
                 for (int t = 0; t < taps; t++)
                 {
                     double o = offsets[t];
-                    double v = pol * SampleDirectional(map, px + o * nx, py + o * ny, nx, ny);
+                    double v = Respond(SampleDirectional(map, px + o * nx, py + o * ny, nx, ny), pol);
                     if (v > bestVal) { bestVal = v; bestOff = o; }
                 }
                 if (bestVal < minResponse) continue;   // no edge found along the normal
@@ -799,9 +884,9 @@ public sealed class SearchEngine
                 int ti = (int)Math.Round((bestOff + radius) / step);
                 if (ti > 0 && ti < taps - 1)
                 {
-                    double v0 = pol * SampleDirectional(map, px + offsets[ti - 1] * nx, py + offsets[ti - 1] * ny, nx, ny);
+                    double v0 = Respond(SampleDirectional(map, px + offsets[ti - 1] * nx, py + offsets[ti - 1] * ny, nx, ny), pol);
                     double v1 = bestVal;
-                    double v2 = pol * SampleDirectional(map, px + offsets[ti + 1] * nx, py + offsets[ti + 1] * ny, nx, ny);
+                    double v2 = Respond(SampleDirectional(map, px + offsets[ti + 1] * nx, py + offsets[ti + 1] * ny, nx, ny), pol);
                     double denom = v0 - 2 * v1 + v2;
                     if (Math.Abs(denom) > 1e-9) off += 0.5 * (v0 - v2) / denom * step;
                 }
@@ -846,7 +931,13 @@ public sealed class SearchEngine
     // ------------------------------------------------------------------
     private static List<MatchResult> SuppressOverlaps(List<MatchResult> input, PatternModel model, SearchOptions opt)
     {
-        input.Sort((a, b) => b.Score.CompareTo(a.Score));
+        input.Sort((a, b) =>
+        {
+            int c = b.Score.CompareTo(a.Score);
+            if (c != 0) return c;
+            c = a.X.CompareTo(b.X);
+            return c != 0 ? c : a.Y.CompareTo(b.Y);
+        });
         var kept = new List<MatchResult>(input.Count);
         double minDist = opt.MinSeparationPixels > 0
             ? opt.MinSeparationPixels

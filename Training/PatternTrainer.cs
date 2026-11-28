@@ -95,7 +95,8 @@ public static class PatternTrainer
             TrainWidth = image.Width,
             TrainHeight = image.Height,
             Grain = opt.Grain,
-            N = opt.N
+            N = opt.N,
+            PolarityAgnostic = opt.IgnorePolarity
         };
 
         // ---- stage 1: thinned, strong edge pixels inside the region ----
@@ -211,7 +212,7 @@ public static class PatternTrainer
                 nx = -nx; ny = -ny;
                 polarity = -1;
             }
-            if (opt.IgnorePolarity) polarity = 1;
+
 
             model.AddFeature(x, y, nx, ny, m, polarity, 1.0f);
         }

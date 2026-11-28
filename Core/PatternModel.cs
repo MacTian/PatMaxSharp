@@ -101,6 +101,14 @@ public sealed class PatternModel
     /// <summary>Effective grain (coarse/fine) used to build the smoothing kernel.</summary>
     public double Grain { get; set; } = 1.0;
 
+    /// <summary>
+    /// Ignore edge polarity: the matcher compares |directional response| instead of the signed
+    /// one, so a part seen as dark-on-light also matches when it is seen as light-on-dark
+    /// (backlight, silhouette, inverted illumination). This is CogPMAlignPattern.IgnorePolarity,
+    /// which the VisionPro PatMax demo runs with enabled.
+    /// </summary>
+    public bool PolarityAgnostic { get; set; }
+
     /// <summary>Reference contrast: 75th percentile of feature magnitudes at train time, floored at 1.0.</summary>
     public double ContrastRef { get; set; } = 1.0;
 

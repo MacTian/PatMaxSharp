@@ -21,7 +21,10 @@ int calIndex = Array.FindIndex(args, a => a.Equals("--cal", StringComparison.Ord
 if (calIndex >= 0)
 {
     string directory = calIndex + 1 < args.Length ? args[calIndex + 1] : ".";
-    CalibrationCheck.Run(directory, preview: true);
+    bool autoFloor = !args.Any(a => a.Equals("--no-autofloor", StringComparison.OrdinalIgnoreCase));
+    bool ncc = args.Any(a => a.Equals("--ncc", StringComparison.OrdinalIgnoreCase));   // opt-in
+    bool ignorePolarity = args.Any(a => a.Equals("--ignore-polarity", StringComparison.OrdinalIgnoreCase));
+    CalibrationCheck.Run(directory, preview: true, autoNoiseFloor: autoFloor, normalizedCorrelation: ncc, ignorePolarity: ignorePolarity);
     return 0;
 }
 
