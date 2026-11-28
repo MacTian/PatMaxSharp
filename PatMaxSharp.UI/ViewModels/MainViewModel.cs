@@ -36,6 +36,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RunCommand = new RelayCommand(_ => Run(), _ => _trained && _image != null);
         ClearCommand = new RelayCommand(_ => Clear(), _ => _image != null);
         BatchValidateCommand = new RelayCommand(_ => BatchValidate());
+        CenterOriginCommand = new RelayCommand(_ => OriginFollowsCenter = true);
         SavePresetCommand = new RelayCommand(_ => SavePreset());
         NewPresetCommand = new RelayCommand(_ => NewPreset());
         DeletePresetCommand = new RelayCommand(_ => DeletePreset(), _ => SelectedPreset != null && !IsBuiltIn(SelectedPreset));
@@ -212,6 +213,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanTrain));
                 OnPropertyChanged(nameof(TrainRegionText));
                 System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+                if (value.HasValue && OriginFollowsCenter) SnapOriginToCenter();
                 // drawing a new region brings the green overlay back
                 if (value.HasValue) ShowTrainRegion = true;
             }
@@ -240,6 +242,72 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         get => _AutoEdgeThreshold;
         set { if (Set(ref _AutoEdgeThreshold, value)) _tool.EdgeDetector.AutoNoiseFloor = value; }
+    }
+
+    // ---- training origin (Cognex 训练区域与原点) ----
+    private double _originX;
+    public double OriginX
+    {
+        get => _originX;
+        set
+        {
+            if (!Set(ref _originX, value)) return;
+            _originFollowsCenter = false;
+            OnPropertyChanged(nameof(OriginFollowsCenter));
+            OnPropertyChanged(nameof(OriginIsFollowedByCenter));
+            OnPropertyChanged(nameof(OriginText));
+            OnPropertyChanged(nameof(OriginPoint));
+        }
+    }
+
+    private double _originY;
+    public double OriginY
+    {
+        get => _originY;
+        set
+        {
+            if (!Set(ref _originY, value)) return;
+            _originFollowsCenter = false;
+            OnPropertyChanged(nameof(OriginFollowsCenter));
+            OnPropertyChanged(nameof(OriginIsFollowedByCenter));
+            OnPropertyChanged(nameof(OriginText));
+            OnPropertyChanged(nameof(OriginPoint));
+        }
+    }
+
+    private bool _originFollowsCenter = true;
+
+    /// <summary>While true, a new training region snaps the origin to its centre.</summary>
+    public bool OriginFollowsCenter
+    {
+        get => _originFollowsCenter;
+        set
+        {
+            if (!Set(ref _originFollowsCenter, value)) return;
+            if (value) SnapOriginToCenter();
+            OnPropertyChanged(nameof(OriginIsFollowedByCenter));
+        }
+    }
+
+    public bool OriginIsFollowedByCenter => _originFollowsCenter;
+
+    public string OriginText => $"({OriginX:F1}, {OriginY:F1})";
+
+    /// <summary>Origin in image coordinates, drawn as a cross on the canvas.</summary>
+    public System.Windows.Point? OriginPoint =>
+        TrainRegion.HasValue ? new System.Windows.Point(OriginX, OriginY) : null;
+
+    public ICommand CenterOriginCommand { get; }
+
+    private void SnapOriginToCenter()
+    {
+        if (TrainRegion is not Rect r) return;
+        _originX = r.X + r.Width / 2.0;
+        _originY = r.Y + r.Height / 2.0;
+        OnPropertyChanged(nameof(OriginX));
+        OnPropertyChanged(nameof(OriginY));
+        OnPropertyChanged(nameof(OriginText));
+        OnPropertyChanged(nameof(OriginPoint));
     }
 
     private bool _showTrainRegion = true;
@@ -537,8 +605,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
             var gray = ToGray((BitmapSource)Image);
             var r = TrainRegion.Value;
             var crop = Crop(gray, (int)r.X, (int)r.Y, (int)r.Width, (int)r.Height);
-            var originX = crop.Width / 2.0;
-            var originY = crop.Height / 2.0;
+
+            // The origin the user picked, expressed inside the crop. Training and matching are
+            // both relative to it, so results report the coordinates of *that* point.
+            if (OriginFollowsCenter) SnapOriginToCenter();
+            double originX = Math.Clamp(OriginX - r.X, 0, crop.Width - 1);
+            double originY = Math.Clamp(OriginY - r.Y, 0, crop.Height - 1);
 
             _tool.EdgeDetector.UseSimd = UseSimd;
             _tool.EdgeDetector.UseParallel = UseParallel;
@@ -563,7 +635,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
             Trained = true;
             Status = $"训练完成: {pattern.FeatureCount} 特征, W={pattern.W:F2}, " +
-                     $"grain={Grain}, 边缘阈值={_tool.EdgeDetector.LastEffectiveFloor:F1}" +
+                     $"原点 {OriginText}, 边缘阈值={_tool.EdgeDetector.LastEffectiveFloor:F1}" +
                      $"{(_tool.Pattern.PolarityAgnostic ? ", 无极性" : "")}";
             Results.Clear();
         }
@@ -603,6 +675,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _tool.EdgeDetector.UseSimd = UseSimd;
             _tool.EdgeDetector.UseParallel = UseParallel;
             var pattern = _tool.Train(baseImage, roi, roi.X + (roi.Width - 1) / 2.0, roi.Y + (roi.Height - 1) / 2.0, Grain);
+            // batch/review use the region centre as origin by definition
+            TrainRegion = new Rect(roi.X, roi.Y, roi.Width, roi.Height);
+            OriginFollowsCenter = true;
 
             if (pattern.FeatureCount < 8)
             {
@@ -682,6 +757,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _tool.EdgeDetector.UseSimd = UseSimd;
             _tool.EdgeDetector.UseParallel = UseParallel;
             var pattern = _tool.Train(baseImage, roi, roi.X + (roi.Width - 1) / 2.0, roi.Y + (roi.Height - 1) / 2.0, Grain);
+            // batch/review use the region centre as origin by definition
+            TrainRegion = new Rect(roi.X, roi.Y, roi.Width, roi.Height);
+            OriginFollowsCenter = true;
             if (pattern.FeatureCount < 8)
             {
                 Trained = false;

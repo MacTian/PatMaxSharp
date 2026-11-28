@@ -99,6 +99,17 @@ public partial class ImageRegionSelector : UserControl
         set => SetValue(PatternOutlineProperty, value);
     }
 
+    /// <summary>Training origin in image pixels, drawn as a cross so it is visible while framing.</summary>
+    public static readonly DependencyProperty OriginPointProperty =
+        DependencyProperty.Register(nameof(OriginPoint), typeof(Point?), typeof(ImageRegionSelector),
+            new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).Redraw()));
+
+    public Point? OriginPoint
+    {
+        get => (Point?)GetValue(OriginPointProperty);
+        set => SetValue(OriginPointProperty, value);
+    }
+
     /// <summary>Whether the green training rectangle is drawn (hidden again after a run).</summary>
     public static readonly DependencyProperty ShowTrainRegionProperty =
         DependencyProperty.Register(nameof(ShowTrainRegion), typeof(bool), typeof(ImageRegionSelector),
@@ -233,6 +244,23 @@ public partial class ImageRegionSelector : UserControl
 
         if (SearchRegion is Rect sr) SetRect(_searchRect, sr);
         else _searchRect.Visibility = Visibility.Collapsed;
+
+        // training origin: a cross + ring so the point the model is defined around is visible
+        foreach (var el in _canvas.Children.OfType<FrameworkElement>().Where(fe => fe.Tag is OriginTag).ToList())
+            _canvas.Children.Remove(el);
+        if (OriginPoint is Point op)
+        {
+            double ox = op.X * Zoom, oy = op.Y * Zoom;
+            var ob = Brushes.DeepSkyBlue;
+            var crossH = new Line { X1 = ox - 10, Y1 = oy, X2 = ox + 10, Y2 = oy, Stroke = ob, StrokeThickness = 1.5, Tag = new OriginTag() };
+            var crossV = new Line { X1 = ox, Y1 = oy - 10, X2 = ox, Y2 = oy + 10, Stroke = ob, StrokeThickness = 1.5, Tag = new OriginTag() };
+            var ring = new Ellipse { Width = 14, Height = 14, Stroke = ob, StrokeThickness = 1.5, Fill = Brushes.Transparent, Tag = new OriginTag() };
+            Canvas.SetLeft(ring, ox - 7);
+            Canvas.SetTop(ring, oy - 7);
+            _canvas.Children.Add(crossH);
+            _canvas.Children.Add(crossV);
+            _canvas.Children.Add(ring);
+        }
 
         var old = _canvas.Children.OfType<FrameworkElement>()
             .Where(fe => fe.Tag is MatchMarkerTag).ToList();
@@ -384,6 +412,7 @@ public partial class ImageRegionSelector : UserControl
     private Point ToImage(Point canvasPoint) => new(canvasPoint.X / Zoom, canvasPoint.Y / Zoom);
 
     private sealed class MatchMarkerTag { }
+    private sealed class OriginTag { }
 }
 
 /// <summary>A match result marker drawn on the image.</summary>

@@ -236,6 +236,14 @@
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="{StaticResource BText}"/>
+            <Setter Property="Background" Value="#1F1F23"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BBorder}"/>
+            <Setter Property="CaretBrush" Value="{StaticResource BText}"/>
+            <Setter Property="Padding" Value="4,3"/>
+        </Style>
+
         <Style TargetType="ComboBox">
             <Setter Property="Foreground" Value="{StaticResource BText}"/>
             <Setter Property="Background" Value="{StaticResource BControl}"/>
@@ -347,7 +355,36 @@
                         </StackPanel>
                     </Expander>
 
-                    <Expander Header="2. 训练参数">
+                    <Expander Header="2. 训练原点">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource hint}"
+                                       Text="匹配结果中的 (X, Y) 就是这个点在图像里的位置。缺省取训练区中心。"/>
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="70"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="原点 X" Style="{StaticResource lbl}"/>
+                                <TextBox Grid.Column="1" Margin="2"
+                                         Text="{Binding OriginX, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"/>
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="70"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="原点 Y" Style="{StaticResource lbl}"/>
+                                <TextBox Grid.Column="1" Margin="2"
+                                         Text="{Binding OriginY, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"/>
+                            </Grid>
+                            <CheckBox Content="跟随训练区中心" IsChecked="{Binding OriginFollowsCenter}" Margin="2,6,2,2"/>
+                            <Button Content="中心原点" Command="{Binding CenterOriginCommand}" HorizontalAlignment="Left"/>
+                            <TextBlock Style="{StaticResource value}" Text="{Binding OriginText}" Margin="2,6,0,0"/>
+                            <TextBlock Style="{StaticResource hint}"
+                                       Text="原点坐标系的旋转/倾斜（Cognex 面板中的 旋转 / 倾斜）尚未实现，按 0° 处理。"/>
+                        </StackPanel>
+                    </Expander>
+                    <Expander Header="3. 训练参数">
                         <StackPanel>
                             <TextBlock Text="训练算法  PatMax（PatQuick / PatFlex 未实现）" Style="{StaticResource lbl}"/>
                             <CheckBox Content="忽略极性 IgnorePolarity" IsChecked="{Binding IgnorePolarity}"
@@ -365,7 +402,7 @@
                         </StackPanel>
                     </Expander>
 
-                    <Expander Header="3. 查找参数">
+                    <Expander Header="4. 查找参数">
                         <StackPanel>
                             <TextBlock Style="{StaticResource hint}"
                                        Text="搜索覆盖整幅图；角度/缩放区间越窄越快。"/>
@@ -386,7 +423,7 @@
                         </StackPanel>
                     </Expander>
 
-                    <Expander Header="4. 评分参数">
+                    <Expander Header="5. 评分参数">
                         <StackPanel>
                             <TextBlock Text="{Binding AcceptThreshold, StringFormat='接受阈值：{0:F2}'}" Style="{StaticResource lbl}"/>
                             <Slider Minimum="0" Maximum="1" Value="{Binding AcceptThreshold}" TickFrequency="0.01"/>
@@ -399,7 +436,7 @@
                         </StackPanel>
                     </Expander>
 
-                    <Expander Header="5. 性能 / 精度">
+                    <Expander Header="6. 性能 / 精度">
                         <StackPanel>
                             <TextBlock Text="{Binding PrecisionStep, StringFormat='粗层位置步长：{0} px'}" Style="{StaticResource lbl}"/>
                             <Slider Minimum="1" Maximum="8" Value="{Binding PrecisionStep}" TickFrequency="1"/>
@@ -414,7 +451,7 @@
                         </StackPanel>
                     </Expander>
 
-                    <Expander Header="6. 参数预设">
+                    <Expander Header="7. 参数预设">
                         <StackPanel>
                             <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
                                       DisplayMemberPath="Name" ToolTip="{Binding SelectedPreset.Description}"/>
@@ -449,6 +486,7 @@
                             SearchRegion="{Binding SearchRegion, Mode=TwoWay}"
                             Markers="{Binding Markers}"
                             PatternOutline="{Binding PatternOutline}"
+                            OriginPoint="{Binding OriginPoint}"
                             ShowTrainRegion="{Binding ShowTrainRegion}"
                             ImageWidth="{Binding ImagePixelWidth}"
                             ImageHeight="{Binding ImagePixelHeight}"/>
