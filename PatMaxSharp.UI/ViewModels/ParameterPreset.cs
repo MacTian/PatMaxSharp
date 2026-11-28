@@ -23,7 +23,7 @@ public sealed class ParameterPreset
     [JsonPropertyName("timeoutMs")] public double TimeoutMs { get; set; } = 5000;
 
     // ---- Scoring parameters ----
-    [JsonPropertyName("acceptThreshold")] public double AcceptThreshold { get; set; } = 0.5;
+    [JsonPropertyName("acceptThreshold")] public double AcceptThreshold { get; set; } = 0.7;
     [JsonPropertyName("contrastThreshold")] public double ContrastThreshold { get; set; } = 0.1;
     [JsonPropertyName("grain")] public double Grain { get; set; } = 1.0;
     [JsonPropertyName("coarseGrainLimit")] public int CoarseGrainLimit { get; set; } = 10;
@@ -52,21 +52,21 @@ public sealed class ParameterPreset
         {
             Name = "默认 (Default)",
             Description = "通用场景的平衡配置",
-            AcceptThreshold = 0.5, Grain = 1.0, MaxResults = 10
+            AcceptThreshold = 0.7, Grain = 1.0, MaxResults = 10
         },
         new ParameterPreset
         {
             Name = "高精度 (High Precision)",
             Description = "亚像素细化 + 细粒度 + ±5% 尺度搜索，速度较慢",
             PrecisionStep = 1, SubpixelRefinement = true, Grain = 2.0,
-            CoarseGrainLimit = 8, FineGrainLimit = 4, AcceptThreshold = 0.6,
+            CoarseGrainLimit = 8, FineGrainLimit = 4, AcceptThreshold = 0.75,
             ScaleMin = 0.95, ScaleMax = 1.05
         },
         new ParameterPreset
         {
             Name = "高速 (High Speed)",
             Description = "粗粒度 + 大 step，适合快速筛选",
-            PrecisionStep = 4, SubpixelRefinement = false, Grain = 5.0,
+            PrecisionStep = 4, SubpixelRefinement = false, Grain = 5.0, AcceptThreshold = 0.6,
             CoarseGrainLimit = 12, FineGrainLimit = 6, MaxResults = 5
         },
         new ParameterPreset
@@ -81,7 +81,7 @@ public sealed class ParameterPreset
             Name = "多目标 (Multi-Target)",
             Description = "查找多个目标，低重叠阈值",
             ApproximateNumberToFind = 5, XYOverlap = 0.2, MaxResults = 20,
-            AcceptThreshold = 0.45
+            AcceptThreshold = 0.6
         }
     };
 }

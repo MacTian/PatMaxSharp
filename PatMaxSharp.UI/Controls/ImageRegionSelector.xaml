@@ -6,7 +6,8 @@
          image pixels: no offset, no letterbox, no element-vs-content mismatch. Children
          (region rectangles, markers, overlay) are positioned in image pixels directly. -->
     <ScrollViewer x:Name="scroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                  Background="Black">
+                  Background="Black"
+                  HorizontalContentAlignment="Left" VerticalContentAlignment="Top">
         <Canvas x:Name="canvas"
                 MouseLeftButtonDown="OnMouseDown"
                 MouseMove="OnMouseMove"

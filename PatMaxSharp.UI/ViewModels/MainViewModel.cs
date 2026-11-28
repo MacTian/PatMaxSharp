@@ -168,7 +168,39 @@ public sealed class MainViewModel : INotifyPropertyChanged
     #endregion
 
     #region Properties
-    public ImageSource Image { get => _image; private set => Set(ref _image, (BitmapSource)value); }
+    public ImageSource Image
+    {
+        get => _image;
+        private set
+        {
+            if (Set(ref _image, (BitmapSource)value))
+            {
+                OnPropertyChanged(nameof(HasImage));
+                OnPropertyChanged(nameof(ShowCanvasHint));
+            }
+        }
+    }
+
+    /// <summary>True once an image is loaded (drives the canvas placeholder and button states).</summary>
+    public bool HasImage => _image != null;
+
+    /// <summary>Show the workflow hint over the empty canvas.</summary>
+    public bool ShowCanvasHint => _image == null;
+
+    /// <summary>Compact summary of the settings that decide a match, shown in the status bar.</summary>
+    public string ParamsSummary =>
+        $"接受阈值 {AcceptThreshold:F2}   角度 {RotationAngleMin:F0}…{RotationAngleMax:F0}°   " +
+        $"缩放 {ScaleMin:F2}…{ScaleMax:F2}   最大结果 {MaxResults}   " +
+        $"{ (ScoreUsingClutter ? "杂波计分开" : "杂波计分关") }";
+
+    /// <summary>Training region as readable text.</summary>
+    public string TrainRegionText => TrainRegion is Rect r
+        ? $"X {r.X:F0}   Y {r.Y:F0}   W {r.Width:F0}   H {r.Height:F0}"
+        : "未框选";
+
+    public string SearchRegionText => SearchRegion is Rect s
+        ? $"X {s.X:F0}   Y {s.Y:F0}   W {s.Width:F0}   H {s.Height:F0}"
+        : "整幅图";
     public string Status { get => _status; private set => Set(ref _status, value); }
     public Rect? TrainRegion
     {
@@ -178,6 +210,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (Set(ref _trainRegion, value))
             {
                 OnPropertyChanged(nameof(CanTrain));
+                OnPropertyChanged(nameof(TrainRegionText));
+                System.Windows.Input.CommandManager.InvalidateRequerySuggested();
                 // drawing a new region brings the green overlay back
                 if (value.HasValue) ShowTrainRegion = true;
             }
@@ -219,8 +253,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _showTrainRegion;
         private set => Set(ref _showTrainRegion, value);
     }
-    public Rect? SearchRegion { get => _searchRegion; set => Set(ref _searchRegion, value); }
-    public bool Trained { get => _trained; private set => Set(ref _trained, value); }
+    public Rect? SearchRegion
+    {
+        get => _searchRegion;
+        set { if (Set(ref _searchRegion, value)) OnPropertyChanged(nameof(SearchRegionText)); }
+    }
+    public bool Trained
+    {
+        get => _trained;
+        private set
+        {
+            if (Set(ref _trained, value)) System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+        }
+    }
     public bool CanTrain => _image != null && TrainRegion.HasValue;
 
     /// <summary>Displayed image size in pixels.</summary>
@@ -276,31 +321,31 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public double RotationAngleMin
     {
         get => _RotationAngleMin;
-        set => Set(ref _RotationAngleMin, value);
+        set { if (Set(ref _RotationAngleMin, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
     private double _RotationAngleMax = 180;
     public double RotationAngleMax
     {
         get => _RotationAngleMax;
-        set => Set(ref _RotationAngleMax, value);
+        set { if (Set(ref _RotationAngleMax, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
     private double _ScaleMin = 1.0;
     public double ScaleMin
     {
         get => _ScaleMin;
-        set => Set(ref _ScaleMin, value);
+        set { if (Set(ref _ScaleMin, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
     private double _ScaleMax = 1.0;
     public double ScaleMax
     {
         get => _ScaleMax;
-        set => Set(ref _ScaleMax, value);
+        set { if (Set(ref _ScaleMax, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
     private double _AcceptThreshold = 0.7;
     public double AcceptThreshold
     {
         get => _AcceptThreshold;
-        set => Set(ref _AcceptThreshold, value);
+        set { if (Set(ref _AcceptThreshold, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
     private double _ContrastThreshold = 0.1;
     public double ContrastThreshold
@@ -318,7 +363,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public int MaxResults
     {
         get => _MaxResults;
-        set => Set(ref _MaxResults, value);
+        set { if (Set(ref _MaxResults, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
     private int _CoarseGrainLimit = 10;
     public int CoarseGrainLimit
@@ -354,7 +399,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool ScoreUsingClutter
     {
         get => _ScoreUsingClutter;
-        set => Set(ref _ScoreUsingClutter, value);
+        set { if (Set(ref _ScoreUsingClutter, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
 
     public ObservableCollection<MatchResult> Results { get; } = new();
@@ -727,91 +772,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>Result of the calibration verification test.</summary>
-    public string CalibrationReport { get; private set; } = "";
-
-    public ICommand CalibrationTestCommand => new RelayCommand(_ => RunCalibrationTest());
-
-    private void RunCalibrationTest()
-    {
-        try
-        {
-            string dir = @"D:\FTP\calibration";
-            if (!Directory.Exists(dir)) { Status = "标定目录不存在"; return; }
-
-            var names = new[] { "1.png", "2.png", "3.png", "4.png", "5.png", "6.png", "7.png", "8.png", "9.png", "r1.png", "r2.png", "r3.png" };
-            var sb = new System.Text.StringBuilder();
-
-            // train on 1.png (load it if the current image is empty)
-            var tmpl = Image == null ? LoadPng(Path.Combine(dir, "1.png")) : ToGray((BitmapSource)Image);
-            var tb = FindObject(tmpl);
-            var tool = new PatMaxTool();
-            var pat = tool.Train(tmpl, tb.x + tb.w / 2.0, tb.y + tb.h / 2.0, Grain);
-            sb.AppendLine($"模板 1.png: 特征数={pat.FeatureCount}, 目标({tb.x},{tb.y}) {tb.w}x{tb.h}");
-
-            foreach (var name in names)
-            {
-                var fp = Path.Combine(dir, name);
-                if (!File.Exists(fp)) continue;
-                var img = LoadPng(fp);
-                var ob = FindObject(img);
-                int ex = ob.x + ob.w / 2, ey = ob.y + ob.h / 2;
-                var r = tool.Run(img, 1);
-                var s0 = r.Count > 0 ? r[0] : null;
-                sb.AppendLine($"{name,-8} 期望=({ex,4},{ey,4})  " +
-                              (s0 != null
-                                  ? $"结果=({s0.X,4:F0},{s0.Y,4:F0}) 得分={s0.Score:F3} 覆盖={s0.Coverage:P0} 角度={s0.Angle * 180 / Math.PI:F1}°"
-                                  : "无结果"));
-            }
-            CalibrationReport = sb.ToString();
-            OnPropertyChanged(nameof(CalibrationReport));
-            Status = "标定测试完成";
-
-            // The report has no bound panel, so show it — otherwise the button looks inert.
-            MessageBox.Show(sb.ToString(), "标定测试结果",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        catch (Exception ex) { Status = "标定测试失败: " + ex.Message; }
-    }
-
-    private static (int x, int y, int w, int h) FindObject(GrayImage img)
-    {
-        int minX = int.MaxValue, minY = int.MaxValue, maxX = -1, maxY = -1;
-        for (int y = 0; y < img.Height; y++)
-            for (int x = 0; x < img.Width; x++)
-                if (img[x, y] > 40)
-                {
-                    if (x < minX) minX = x;
-                    if (y < minY) minY = y;
-                    if (x > maxX) maxX = x;
-                    if (y > maxY) maxY = y;
-                }
-        if (maxX < 0) return (0, 0, img.Width, img.Height);
-        return (minX, minY, maxX - minX + 1, maxY - minY + 1);
-    }
-
-    private static GrayImage LoadPng(string path)
-    {
-        var b = new BitmapImage();
-        b.BeginInit();
-        b.CacheOption = BitmapCacheOption.OnLoad;
-        b.UriSource = new Uri(path);
-        b.EndInit(); b.Freeze();
-        int w = b.PixelWidth, h = b.PixelHeight;
-        var px = new byte[w * h * 4];
-        b.CopyPixels(px, w * 4, 0);
-        var g = new byte[w * h];
-        for (int i = 0; i < w * h; i++)
-            g[i] = (byte)(px[i * 4] * 0.114 + px[i * 4 + 1] * 0.587 + px[i * 4 + 2] * 0.299);
-        return new GrayImage(w, h, g);
-    }
-
     /// <summary>Refresh region bindings after a region is drawn on the canvas.</summary>
     public void RefreshRegions()
     {
         OnPropertyChanged(nameof(TrainRegion));
         OnPropertyChanged(nameof(SearchRegion));
         OnPropertyChanged(nameof(CanTrain));
+        OnPropertyChanged(nameof(TrainRegionText));
+        OnPropertyChanged(nameof(SearchRegionText));
     }
 
     private void Clear()

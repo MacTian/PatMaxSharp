@@ -44,6 +44,9 @@ public partial class MainWindow : Window
         else if (args.Length > 1 && System.IO.File.Exists(args[1]))
             _vm.LoadImageFile(args[1]);
 
+        timeText.Text = "-";
+        tputText.Text = "-";
+
         rbTrain.Checked += (_, _) => viewer.SelectMode = RegionKind.Train;
         rbSearch.Checked += (_, _) => viewer.SelectMode = RegionKind.Search;
 
