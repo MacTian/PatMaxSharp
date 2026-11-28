@@ -21,6 +21,11 @@ bool Has(string flag) => args.Any(a => a.Equals(flag, StringComparison.OrdinalIg
 int presetIndex = Array.FindIndex(args, a => a.Equals("--presets", StringComparison.OrdinalIgnoreCase));
 if (presetIndex >= 0 && presetIndex + 1 < args.Length)
 {
+    if (args.Any(a => a.Equals("--list", StringComparison.OrdinalIgnoreCase)))
+    {
+        PresetCheck.List();
+        return 0;
+    }
     PresetCheck.Run(args[presetIndex + 1],
         args.Any(a => a.Equals("--detail", StringComparison.OrdinalIgnoreCase)));
     return 0;

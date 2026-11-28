@@ -11,6 +11,83 @@ namespace ShapeAnchor.Benchmarks;
 /// </summary>
 public static class PresetCheck
 {
+    /// <summary>
+    /// Print every preset side by side, marking the values that differ from the first one. Read
+    /// by reflection so the table cannot drift from the catalog.
+    /// </summary>
+    public static void List()
+    {
+        var presets = PresetCatalog.BuiltIn;
+        var props = typeof(SearchPreset).GetProperties()
+            .Where(p => p.PropertyType == typeof(double) || p.PropertyType == typeof(int)
+                        || p.PropertyType == typeof(bool))
+            .ToArray();
+
+        var labels = new Dictionary<string, string>
+        {
+            ["AcceptThreshold"] = "接受阈值 AcceptThreshold",
+            ["ContrastThreshold"] = "对比度阈值 ContrastThreshold",
+            ["ScoreUsingClutter"] = "杂波计分 ScoreUsingClutter",
+            ["RotationAngleMin"] = "角度下限 RotationAngleMin",
+            ["RotationAngleMax"] = "角度上限 RotationAngleMax",
+            ["ScaleMin"] = "尺度下限 ScaleMin",
+            ["ScaleMax"] = "尺度上限 ScaleMax",
+            ["ApproximateNumberToFind"] = "预期数量 ApproximateNumberToFind",
+            ["MaxResults"] = "最大结果 MaxResults",
+            ["XYOverlap"] = "XY 重叠 XYOverlap",
+            ["IgnorePolarity"] = "忽略极性 IgnorePolarity",
+            ["AutoEdgeThreshold"] = "自动边缘阈值 AutoEdgeThreshold",
+            ["EdgeThreshold"] = "边缘阈值 EdgeThreshold",
+            ["Grain"] = "粒度 Grain",
+            ["TrainMaxFeatures"] = "特征数上限 TrainMaxFeatures",
+            ["TrainMinSpacing"] = "特征间距 TrainMinSpacing",
+            ["PrecisionStep"] = "粗层步长 PrecisionStep",
+            ["SubpixelRefinement"] = "亚像素 SubpixelRefinement",
+            ["EnableClustering"] = "聚类 EnableClustering",
+            ["ClusterRadius"] = "聚类半径 ClusterRadius",
+            ["PreSmoothSigma"] = "预平滑 σ PreSmoothSigma",
+            ["MaxCandidates"] = "候选数 MaxCandidates",
+            ["TimeoutMs"] = "超时 TimeoutMs"
+        };
+
+        Console.WriteLine("列 0 为默认值；行尾 * 表示该预设与默认不同。\n");
+        Console.WriteLine($"{"参数",-34}" + string.Concat(presets.Select((p, i) => $"{"[" + i + "]",10}")));
+        Console.WriteLine($"{"",-34}" + string.Concat(presets.Select(p => $"{Trim(p.Name),10}")));
+
+        foreach (var prop in props)
+        {
+            object first = prop.GetValue(presets[0])!;
+            var cells = presets.Select(p => prop.GetValue(p)!).ToArray();
+            bool anyDiff = cells.Any(v => !Equals(v, first));
+            if (!anyDiff) continue;
+
+            string label = labels.TryGetValue(prop.Name, out var l) ? l : prop.Name;
+            var line = new System.Text.StringBuilder();
+            line.Append(label.PadRight(34));
+            foreach (var v in cells)
+            {
+                string s = v switch
+                {
+                    bool b => b ? "✓" : "✗",
+                    double d => Math.Abs(d) < 1e-9 ? "0" : d.ToString("0.###"),
+                    _ => v.ToString()!
+                };
+                bool diff = !Equals(v, first);
+                line.Append((s + (diff ? "*" : "")).PadLeft(10));
+            }
+            Console.WriteLine(line.ToString());
+        }
+
+        Console.WriteLine();
+        foreach (var (p, i) in presets.Select((p, i) => (p, i)))
+            Console.WriteLine($"[{i}] {p.Name} — {p.Description}");
+
+        static string Trim(string s)
+        {
+            int cut = s.IndexOfAny(new[] { '（', '(' });
+            return (cut > 0 ? s[..cut] : s).Trim();
+        }
+    }
     public static void Run(string directory, bool detail = false)
     {
         if (!Directory.Exists(directory)) { Console.WriteLine($"[preset] directory not found: {directory}"); return; }
