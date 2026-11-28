@@ -16,7 +16,8 @@ namespace PatMaxSharp.Benchmarks;
 /// </summary>
 public static class CalibrationCheck
 {
-    public static void Run(string directory, bool preview, bool autoNoiseFloor = true, bool normalizedCorrelation = false, bool ignorePolarity = false)
+    public static void Run(string directory, bool preview, bool autoNoiseFloor = true, bool normalizedCorrelation = false,
+        bool ignorePolarity = false, bool cognexDemoPreset = false)
     {
         if (!Directory.Exists(directory)) { Console.WriteLine($"[cal] directory not found: {directory}"); return; }
 
@@ -41,6 +42,25 @@ public static class CalibrationCheck
             RotationAngleMax = 180,
             TrainMaxFeatures = 600
         };
+
+        // Mirror the runtime page of the CogPMAlignTool1 demo running in VisionPro QuickBuild:
+        // 3 to find, accept 0.5, coarse-accept method off, angle zone -45..45, scale zone 0.6..1.6,
+        // contrast threshold 0, clutter not scored.
+        int resultsPerImage = 1;
+        if (cognexDemoPreset)
+        {
+            resultsPerImage = 3;
+            tool.RotationAngleMin = -45;
+            tool.RotationAngleMax = 45;
+            tool.ScaleMin = 0.6;
+            tool.ScaleMax = 1.6;
+            tool.ContrastThreshold = 0.0;
+            tool.UseClutter = false;
+            tool.CoarseAcceptThreshold = 0.0;
+            tool.NoiseFloor = 5.0;
+            tool.IgnorePolarity = true;
+        }
+        Console.WriteLine($"[cal] preset  = {(cognexDemoPreset ? "Cognex demo (angle +-45, scale 0.6-1.6, contrast 0, clutter off, find 3)" : "library defaults")}");
         Console.WriteLine($"[cal] options = autoNoiseFloor:{autoNoiseFloor}  normalizedCorrelation:{normalizedCorrelation}  ignorePolarity:{ignorePolarity}");
         tool.NormalizedCorrelation = normalizedCorrelation;
         tool.IgnorePolarity = ignorePolarity;
@@ -62,7 +82,7 @@ public static class CalibrationCheck
         {
             var image = ImageLoader.Load(file);
             var watch = Stopwatch.StartNew();
-            var results = tool.Run(image, 1);
+            var results = tool.Run(image, resultsPerImage);
             watch.Stop();
             string name = Path.GetFileName(file);
 
@@ -93,9 +113,20 @@ public static class CalibrationCheck
 
             var r = results[0];
             rows.Add((name, r));
+
+            // A scale pinned to the search-zone boundary is a degenerate solution: the model can
+            // shrink onto just the strongest inner edges and still score well, so the number is
+            // high but the pose is not the part. Say so instead of letting it read as a hit.
+            string note = "";
+            if (tool.ScaleMin != tool.ScaleMax)
+            {
+                if (Math.Abs(r.Scale - tool.ScaleMin) < 0.01) note = $"  scale@{tool.ScaleMin:F2} (zone edge)";
+                else if (Math.Abs(r.Scale - tool.ScaleMax) < 0.01) note = $"  scale@{tool.ScaleMax:F2} (zone edge)";
+            }
+
             Console.WriteLine($"{name,-12} {r.Score,7:F3} {r.X,9:F2} {r.Y,9:F2} " +
                               $"{r.AngleDegrees,9:F2}° {r.Scale,7:F3} {r.Coverage,6:P0} " +
-                              $"{"",8} {"",8} {watch.Elapsed.TotalMilliseconds,7:F1}ms");
+                              $"{"",8} {"",8} {watch.Elapsed.TotalMilliseconds,7:F1}ms{note}");
         }
 
         // ---- drift against the base pose (meaningful when the part did not move) ----

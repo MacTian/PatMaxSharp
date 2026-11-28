@@ -153,6 +153,14 @@ The rotated readings need one sentence of explanation: this part is self-similar
 
 Command: `dotnet run -c Release -- --cal <directory>`.
 
+### 8.3 Same parameters as the running VisionPro demo
+
+The `PatMax_Demo` job (`CogPMAlignTool1`) in VisionPro QuickBuild on this machine spells out its runtime page, and `--cognex-demo` mirrors it: find 3, accept 0.5, angle zone -45..45, scale zone 0.6..1.6, contrast threshold 0, **clutter scoring off**, ignore polarity, automatic edge threshold.
+
+On the same 17 frames that setting gives **9 frames at score >= 0.90, 8 in 0.70-0.90 and none below 0.70** (the defaults give 8 / 2 / 7). Recall goes up and the price is visible: **6 of them land on the lower scale bound, 0.598-0.604** - the model shrinks onto the strongest inner edges, which is a degenerate solution, and `--cal` marks those rows `scale@0.60 (zone edge)`.
+
+So the demo settings (contrast 0, clutter off) trade discrimination for recall; this library the other way round. Both are self-consistent; which one is right depends on whether the line cares more about false accepts or misses.
+
 ## 9. Parameters
 
 ### 9.1 Quick reference (this implementation's defaults)

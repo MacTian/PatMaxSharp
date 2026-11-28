@@ -24,7 +24,9 @@ if (calIndex >= 0)
     bool autoFloor = !args.Any(a => a.Equals("--no-autofloor", StringComparison.OrdinalIgnoreCase));
     bool ncc = args.Any(a => a.Equals("--ncc", StringComparison.OrdinalIgnoreCase));   // opt-in
     bool ignorePolarity = args.Any(a => a.Equals("--ignore-polarity", StringComparison.OrdinalIgnoreCase));
-    CalibrationCheck.Run(directory, preview: true, autoNoiseFloor: autoFloor, normalizedCorrelation: ncc, ignorePolarity: ignorePolarity);
+    bool cognexPreset = args.Any(a => a.Equals("--cognex-demo", StringComparison.OrdinalIgnoreCase));
+    CalibrationCheck.Run(directory, preview: true, autoNoiseFloor: autoFloor, normalizedCorrelation: ncc,
+        ignorePolarity: ignorePolarity, cognexDemoPreset: cognexPreset);
     return 0;
 }
 
