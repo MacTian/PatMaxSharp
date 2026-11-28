@@ -14,10 +14,14 @@
        tools/ holds standalone analyser projects with their own obj/bin output. -->
   <ItemGroup>
     <Compile Remove="ShapeAnchor.UI\**" />
+    <Compile Remove="ShapeAnchor.Controls\**" />
     <Compile Remove="ShapeAnchor.CalTest\**" />
     <Compile Remove="tools\**" />
     <Compile Remove="docs\**" />
+    <Compile Remove="**\obj\**\*.cs" />
+    <Compile Remove="**\bin\**\*.cs" />
     <None Remove="ShapeAnchor.UI\**" />
+    <None Remove="ShapeAnchor.Controls\**" />
     <None Remove="ShapeAnchor.CalTest\**" />
     <None Remove="tools\**" />
     <None Remove="docs\**" />

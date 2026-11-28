@@ -13,7 +13,7 @@ using Microsoft.Win32;
 using ShapeAnchor;
 using ShapeAnchor.Core;
 using ShapeAnchor.Training;
-using ShapeAnchor.UI.Controls;
+using ShapeAnchor.Controls;
 
 namespace ShapeAnchor.UI.ViewModels;
 

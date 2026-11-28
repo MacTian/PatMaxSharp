@@ -312,6 +312,7 @@ ShapeAnchor/
 ├── tools/cognex-meta/  元数据导出工具（可复现取证）
 ├── .github/workflows/ci.yml
 ├── Program.cs   CLI：演示 / --selftest / --bench / --cal <目录>
+├── ShapeAnchor.Controls/  图像画布控件（独立 WPF 类库，XAML 设计器按引用程序集解析）
 └── ShapeAnchor.UI/  WPF 前端
 ```
 

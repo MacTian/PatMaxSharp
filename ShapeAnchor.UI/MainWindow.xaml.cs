@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Controls;
-using ShapeAnchor.UI.Controls;
+using ShapeAnchor.Controls;
 using ShapeAnchor.UI.ViewModels;
 
 namespace ShapeAnchor.UI;

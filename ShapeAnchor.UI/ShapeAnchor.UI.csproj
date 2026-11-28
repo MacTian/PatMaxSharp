@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShapeAnchor.csproj" />
+    <ProjectReference Include="..\ShapeAnchor.Controls\ShapeAnchor.Controls.csproj" />
   </ItemGroup>
 
 </Project>

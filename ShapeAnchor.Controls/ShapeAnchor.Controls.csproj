@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>disable</Nullable>
+    <AssemblyName>ShapeAnchor.Controls</AssemblyName>
+    <RootNamespace>ShapeAnchor.Controls</RootNamespace>
+  </PropertyGroup>
+
+</Project>

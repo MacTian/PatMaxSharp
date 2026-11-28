@@ -290,6 +290,7 @@ ShapeAnchor/
 ├── tools/cognex-meta/  metadata export tool (reproducible forensics)
 ├── .github/workflows/ci.yml
 ├── Program.cs   CLI: demo / --selftest / --bench / --cal <directory>
+├── ShapeAnchor.Controls/  image canvas control (own WPF library, so the XAML designer resolves it as a reference)
 └── ShapeAnchor.UI/  WPF front end
 ```
 
