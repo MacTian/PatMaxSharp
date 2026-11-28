@@ -293,9 +293,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string OriginText => $"({OriginX:F1}, {OriginY:F1})";
 
-    /// <summary>Origin in image coordinates, drawn as a cross on the canvas.</summary>
+    /// <summary>
+    /// Where the origin marker is drawn.
+    ///
+    /// This is the model origin *in the image currently shown*: before a run that is the point
+    /// picked on the training region, after a run it is the matched pose - the same point, moved
+    /// with the part. It used to be bound to the training coordinates only, which is why the
+    /// marker stayed behind after a match.
+    /// </summary>
     public System.Windows.Point? OriginPoint =>
-        TrainRegion.HasValue ? new System.Windows.Point(OriginX, OriginY) : null;
+        Markers.Count > 0 ? new System.Windows.Point(Markers[0].X, Markers[0].Y)
+        : TrainRegion.HasValue ? new System.Windows.Point(OriginX, OriginY)
+        : null;
 
     public ICommand CenterOriginCommand { get; }
 
@@ -473,7 +482,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<MatchResult> Results { get; } = new();
 
     /// <summary>Markers drawn on the image (position + angle + score).</summary>
-    public List<MatchMarker> Markers { get; private set; } = new();
+    private List<MatchMarker> _markers = new();
+    public List<MatchMarker> Markers
+    {
+        get => _markers;
+        private set
+        {
+            _markers = value ?? new List<MatchMarker>();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(OriginPoint));
+        }
+    }
 
     /// <summary>
     /// Model overlay: feature position relative to the pattern origin plus its unit edge
