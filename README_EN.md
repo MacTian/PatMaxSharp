@@ -342,6 +342,9 @@ Command line:
 | Sub-pixel pose (position, angle and scale fitted together) | |
 | Real images (12 × 640×480 calibration parts) | |
 
+> PatMax's mask feature (Care / Don't Care, at training and at run time) is not implemented yet;
+> the survey and the implementation plan are in `docs/mask-research.md`.
+
 ## 13. Reproducing the numbers
 
 Which command produces which table:
