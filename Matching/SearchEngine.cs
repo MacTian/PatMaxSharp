@@ -831,8 +831,33 @@ public sealed class SearchEngine
             }
         }
 
-        var omFinal = BuildOrientedModel(model, int.MaxValue, angle, scale, pixelScale);
         double minResp = Math.Max(0.5, stats.MagnitudeReference * opt.ContrastThreshold);
+
+        // ---- final scale polish ----
+        // The coarse grid decides which scale samples exist, so the reported scale can still be a
+        // grid value even after the pose fit, and the accuracy then depends on whether the window
+        // happened to put a sample on the true scale. One local search, on the final pose and
+        // judged by the same clamped coverage the acceptance uses, removes that dependency. It stays
+        // inside the caller's window, so a fixed-scale run (ScaleMin == ScaleMax) is untouched.
+        if (opt.ScaleMax - opt.ScaleMin > 1e-6)
+        {
+            double bestScaleLocal = scale;
+            double bestCovLocal = -1;
+            for (int k = -3; k <= 3; k++)
+            {
+                double sc = Math.Clamp(scale * (1.0 + k * 0.005), opt.ScaleMin, opt.ScaleMax);
+                var omK = BuildOrientedModel(model, model.Count, angle, sc, pixelScale);
+                // Coverage saturates at 100% once every feature lands on an edge, so it cannot
+                // discriminate between two scales that both "match". The summed normal response
+                // keeps a gradient after that and picks the scale whose edges line up best.
+                ScoreAtBilinear(map, omK, x, y, invRef, minResp,
+                    opt.SearchMask, opt.SearchMaskWidth, opt.SearchMaskHeight, opt.MaskScoring,
+                    out _, out _, out double responseK, out _, out _, out _);
+                if (responseK > bestCovLocal + 1e-6) { bestCovLocal = responseK; bestScaleLocal = sc; }
+            }
+            scale = bestScaleLocal;
+        }
+        var omFinal = BuildOrientedModel(model, int.MaxValue, angle, scale, pixelScale);
         ScoreAtBilinear(map, omFinal, x, y, invRef, minResp,
             opt.SearchMask, opt.SearchMaskWidth, opt.SearchMaskHeight, opt.MaskScoring,
             out int matched, out double matchedWeight, out double contrastSum, out double polarityCoherence,
@@ -901,9 +926,16 @@ public sealed class SearchEngine
 
         double radius = Math.Max(0.5, opt.NormalSearchRadius);
         double step = Math.Clamp(opt.NormalSearchStep, 0.1, 1.0);
-        int taps = (int)Math.Round(2 * radius / step) + 1;
+
+        // A wrong scale displaces a feature by (scale error) x (distance from the origin), so a
+        // fixed +-1.5 px window only ever sees the features near the origin. Everything further out
+        // is discarded, the similarity fit loses its scale lever, and the result keeps the coarse
+        // grid scale - which shows up exactly as "one part matches, the rest drifts".
+        const double ScaleUncertainty = 0.06;   // half a 4% grid step plus margin
+        double maxRadius = Math.Min(radius + ScaleUncertainty * model.ExtentRadius, 12.0);
+        int taps = (int)Math.Round(2 * maxRadius / step) + 1;
         var offsets = new double[taps];
-        for (int t = 0; t < taps; t++) offsets[t] = -radius + t * step;
+        for (int t = 0; t < taps; t++) offsets[t] = -maxRadius + t * step;
 
         float invRef = 1f / Math.Max(1f, stats.MagnitudeReference);
         double minResponse = Math.Max(1.0, stats.MagnitudeReference * opt.ContrastThreshold * 0.5);
@@ -952,7 +984,7 @@ public sealed class SearchEngine
                 if (Math.Abs(bestOff) > radius * 0.85) continue;
 
                 double off = bestOff;
-                int ti = (int)Math.Round((bestOff + radius) / step);
+                int ti = (int)Math.Round((bestOff + maxRadius) / step);
                 if (ti > 0 && ti < taps - 1)
                 {
                     double v0 = Respond(SampleDirectional(map, px + offsets[ti - 1] * nx, py + offsets[ti - 1] * ny, nx, ny), pol);
@@ -972,7 +1004,10 @@ public sealed class SearchEngine
             if (double.IsNaN(pose.Angle) || double.IsNaN(pose.Scale) || pose.Scale <= 0) return result;
 
             result = new PoseEstimate(pose.X, pose.Y, pose.Angle, pose.Scale, pose.RmsError, pose.Inliers);
-            cx = pose.X; cy = pose.Y; cang = pose.Angle; cscale = pose.Scale;
+            cx = pose.X; cy = pose.Y; cang = pose.Angle;
+            // damp the scale step: with a wider search window a single iteration could otherwise
+            // jump past the true scale and oscillate
+            cscale = Math.Clamp(pose.Scale, cscale * 0.92, cscale * 1.08);
         }
         return result;
     }
@@ -1005,6 +1040,11 @@ public sealed class SearchEngine
         input.Sort((a, b) =>
         {
             int c = b.Score.CompareTo(a.Score);
+            // Coverage saturates: two poses can both score 1.000 while one of them is geometrically
+            // better. Break near-ties on the pose-fit residual so the reported pose does not depend
+            // on which coarse scale sample happened to win.
+            if (Math.Abs(b.Score - a.Score) > 1e-3) return c;
+            c = a.FitError.CompareTo(b.FitError);
             if (c != 0) return c;
             c = a.X.CompareTo(b.X);
             return c != 0 ? c : a.Y.CompareTo(b.Y);
