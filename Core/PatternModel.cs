@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Core;
+namespace ShapeAnchor.Core;
 
 /// <summary>
 /// CogPMAlignTrainAlgorithmConstants — values read from the installed assembly's Constant table.
@@ -96,7 +96,7 @@ public sealed class PatternModel
     /// Training algorithm (CogPMAlignTrainAlgorithmConstants, values verified against the
     /// installed assembly's Constant table — see docs/evidence/params-reference.md).
     /// </summary>
-    public int TrainAlgorithm { get; set; } = (int)PatMaxSharp.Core.TrainAlgorithmConstants.PatMax;
+    public int TrainAlgorithm { get; set; } = (int)ShapeAnchor.Core.TrainAlgorithmConstants.PatMax;
 
     /// <summary>Effective grain (coarse/fine) used to build the smoothing kernel.</summary>
     public double Grain { get; set; } = 1.0;

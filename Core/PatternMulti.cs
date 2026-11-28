@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Core;
+namespace ShapeAnchor.Core;
 
 /// <summary>
 /// How a multi-pattern set is searched (the multi-pattern model is the counterpart of

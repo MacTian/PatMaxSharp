@@ -1,6 +1,6 @@
-using PatMaxSharp.Core;
+using ShapeAnchor.Core;
 
-namespace PatMaxSharp.Benchmarks;
+namespace ShapeAnchor.Benchmarks;
 
 /// <summary>
 /// Procedural test part with a unique, asymmetric shape, plus a renderer that can place it

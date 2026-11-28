@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Transform;
+namespace ShapeAnchor.Transform;
 
 /// <summary>
 /// Thin-Plate Spline (TPS) deformation — the PatFlex model.

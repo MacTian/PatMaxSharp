@@ -1,11 +1,11 @@
 using System.Diagnostics;
 using System.Text;
-using PatMaxSharp;
-using PatMaxSharp.Benchmarks;
-using PatMaxSharp.Core;
-using PatMaxSharp.Edge;
-using PatMaxSharp.Projection;
-using PatMaxSharp.Training;
+using ShapeAnchor;
+using ShapeAnchor.Benchmarks;
+using ShapeAnchor.Core;
+using ShapeAnchor.Edge;
+using ShapeAnchor.Projection;
+using ShapeAnchor.Training;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -41,7 +41,7 @@ if (probeIndex >= 0 && probeIndex + 1 < args.Length)
 
     var probeDetector = new GaborEdgeDetector();
     var probeEdges = probeDetector.Detect(crop);
-    var probeTool = new PatMaxTool(probeDetector);
+    var probeTool = new ShapeAnchorTool(probeDetector);
     var probePattern = probeTool.Train(crop, crop.Width / 2.0, crop.Height / 2.0);
 
     Console.WriteLine($"image   : {Path.GetFileName(args[probeIndex + 1])} {probeImage.Width}x{probeImage.Height}");
@@ -80,7 +80,7 @@ if (calIndex >= 0)
 // ---------------------------------------------------------------------------
 if (selfTest)
 {
-    Console.WriteLine("== PatMaxSharp accuracy self-test ==");
+    Console.WriteLine("== ShapeAnchor accuracy self-test ==");
     var accuracy = BenchmarkSuite.RunAccuracy();
     var multi = BenchmarkSuite.RunMultiInstance();
     var negative = BenchmarkSuite.RunNegative();
@@ -112,7 +112,7 @@ if (selfTest)
 if (!benchOnly)
 {
     Console.WriteLine("=========================================================");
-    Console.WriteLine("  PatMaxSharp - Cognex PatMax (PMAlign) work-alike in C#");
+    Console.WriteLine("  ShapeAnchor - Cognex PatMax (PMAlign) work-alike in C#");
     Console.WriteLine("  train from one region, locate instances anywhere");
     Console.WriteLine("=========================================================");
     Console.WriteLine();
@@ -130,7 +130,7 @@ if (!benchOnly)
     }
     Console.WriteLine();
 
-    var tool = new PatMaxTool
+    var tool = new ShapeAnchorTool
     {
         AcceptThreshold = 0.5,
         TrainMaxFeatures = 500,
@@ -172,9 +172,9 @@ if (!benchOnly)
         Console.WriteLine();
 
         Console.WriteLine("Least-squares affine fit (type 6):");
-        var src = new List<PatMaxSharp.Fit.LeastSquaresFitter.Point2D>
+        var src = new List<ShapeAnchor.Fit.LeastSquaresFitter.Point2D>
             { new(0, 0), new(10, 0), new(0, 10), new(10, 10) };
-        var dst = new List<PatMaxSharp.Fit.LeastSquaresFitter.Point2D>
+        var dst = new List<ShapeAnchor.Fit.LeastSquaresFitter.Point2D>
             { new(20, 10), new(32, 10), new(20, 22), new(32, 22) };
         var xf = tool.FitPose(src, dst);
         Console.WriteLine($"  [{string.Join(", ", xf.ToArray().Select(v => v.ToString("F3")))}]");
@@ -182,7 +182,7 @@ if (!benchOnly)
         Console.WriteLine();
 
         Console.WriteLine("PatFlex thin-plate spline:");
-        var tps = PatMaxSharp.Transform.XformTps.CreateGrid(0, 0, 100, 100, 4, 4);
+        var tps = ShapeAnchor.Transform.XformTps.CreateGrid(0, 0, 100, 100, 4, 4);
         var tpsSrc = new List<(double X, double Y)>();
         var tpsDst = new List<(double X, double Y)>();
         foreach (var cp in tps.ControlPoints)

@@ -14,7 +14,7 @@
 
 ## 与主项目互不干扰
 
-仓库根 `PatMaxSharp.csproj` 使用 SDK 默认 `**/*.cs` 通配，会扫到本目录。两道保险：
+仓库根 `ShapeAnchor.csproj` 使用 SDK 默认 `**/*.cs` 通配，会扫到本目录。两道保险：
 
 1. 本目录所有 `.cs` 整体包在 `#if COGNEX_META ... #endif` 里（未定义该符号时编译结果为空文件）；
 2. 根 `csproj` 已 `Compile Remove="tools\**"` / `<None Remove="tools\**"`，本目录完全不参与主项目编译。

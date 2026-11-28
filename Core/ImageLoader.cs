@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Core;
+namespace ShapeAnchor.Core;
 
 /// <summary>
 /// Format-dispatching image loader: PNG and BMP, chosen by file signature rather than by

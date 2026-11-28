@@ -3,10 +3,10 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Controls;
-using PatMaxSharp.UI.Controls;
-using PatMaxSharp.UI.ViewModels;
+using ShapeAnchor.UI.Controls;
+using ShapeAnchor.UI.ViewModels;
 
-namespace PatMaxSharp.UI;
+namespace ShapeAnchor.UI;
 
 public partial class MainWindow : Window
 {
@@ -19,9 +19,9 @@ public partial class MainWindow : Window
         DataContext = _vm;
 
         // Command line:
-        //   PatMaxSharp.UI.exe <image>             start with that image loaded
-        //   PatMaxSharp.UI.exe --batch <folder>    run the folder check on startup
-        //   PatMaxSharp.UI.exe --cycle <folder>    walk the folder so the overlays can be watched
+        //   ShapeAnchor.UI.exe <image>             start with that image loaded
+        //   ShapeAnchor.UI.exe --batch <folder>    run the folder check on startup
+        //   ShapeAnchor.UI.exe --cycle <folder>    walk the folder so the overlays can be watched
         var args = System.Environment.GetCommandLineArgs();
         if (args.Length > 2 && args[1].Equals("--batch", System.StringComparison.OrdinalIgnoreCase)
             && System.IO.Directory.Exists(args[2]))

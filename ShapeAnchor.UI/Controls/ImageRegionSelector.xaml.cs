@@ -7,7 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
-namespace PatMaxSharp.UI.Controls;
+namespace ShapeAnchor.UI.Controls;
 
 /// <summary>
 /// Image viewer with rectangular region selection.

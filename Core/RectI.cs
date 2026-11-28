@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Core;
+namespace ShapeAnchor.Core;
 
 /// <summary>
 /// Integer axis-aligned rectangle (train region / search region).

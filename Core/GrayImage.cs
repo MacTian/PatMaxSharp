@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace PatMaxSharp.Core;
+namespace ShapeAnchor.Core;
 
 /// <summary>
 /// 8-bit grayscale image (equivalent to Cog8BitImage).

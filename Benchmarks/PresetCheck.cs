@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using PatMaxSharp.Core;
-using PatMaxSharp.Training;
+using ShapeAnchor.Core;
+using ShapeAnchor.Training;
 
-namespace PatMaxSharp.Benchmarks;
+namespace ShapeAnchor.Benchmarks;
 
 /// <summary>
 /// Runs every built-in preset over one folder so a preset claim can be checked instead of
@@ -29,7 +29,7 @@ public static class PresetCheck
 
         foreach (var preset in PresetCatalog.BuiltIn)
         {
-            var tool = new PatMaxTool
+            var tool = new ShapeAnchorTool
             {
                 AcceptThreshold = preset.AcceptThreshold,
                 ContrastThreshold = preset.ContrastThreshold,

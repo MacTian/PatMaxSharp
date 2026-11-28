@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Core;
+namespace ShapeAnchor.Core;
 
 /// <summary>
 /// Geometric feature dipole — the atomic unit of PatMax's feature representation.

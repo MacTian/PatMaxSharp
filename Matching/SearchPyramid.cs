@@ -1,7 +1,7 @@
-using PatMaxSharp.Core;
-using PatMaxSharp.Edge;
+using ShapeAnchor.Core;
+using ShapeAnchor.Edge;
 
-namespace PatMaxSharp.Matching;
+namespace ShapeAnchor.Matching;
 
 /// <summary>
 /// Image pyramid of edge fields (levels of half resolution).

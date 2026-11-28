@@ -1,7 +1,7 @@
-using PatMaxSharp.Core;
-using PatMaxSharp.Edge;
+using ShapeAnchor.Core;
+using ShapeAnchor.Edge;
 
-namespace PatMaxSharp.Projection;
+namespace ShapeAnchor.Projection;
 
 /// <summary>
 /// 1D projection of an edge map along a search direction.

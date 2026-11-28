@@ -1,6 +1,9 @@
-<img src="docs/icon.png" width="76" align="right" alt="PatMaxSharp">
+<img src="docs/icon.png" width="76" align="right" alt="ShapeAnchor">
 
-# PatMaxSharp — C# 实现的 Cognex PatMax (PMAlign) 对标工程
+# ShapeAnchor — 几何特征匹配引擎（C# 从零实现）
+
+> PatMax® 是 Cognex Corporation 的注册商标。本项目与其无任何隶属、授权或背书关系，仅在技术对照中指名提及。
+> 名称 ShapeAnchor 为本项目自有名称，与上述商标无关。
 
 在训练图上框一个区域，在任意搜索图中定位该目标，输出亚像素位置、角度、尺度；独立实现，不链接也不调用 `cogxpma.dll` / `Cognex.VisionPro.PMAlign.dll`。
 合成真值 10/10 用例 PASS：位置误差 ≤ 0.10 px、角度误差 ≤ 0.12°、尺度误差 ≤ 0.0017。
@@ -55,7 +58,7 @@
 | 3 | 模板 = 整幅训练图做滑窗 | 滑窗只有一个合法位置，匹配结果**恒等于训练原点**；平移/旋转/遮挡测试全部返回同一坐标 | 模板改为稀疏特征集（位置、单位法线、极性、强度），在搜索图金字塔上做方向敏感相关，峰值可落在任意位置 |
 | 4 | 位姿拟合的源点与目标点是同一批预测点 | 拟合恒为单位变换，位姿小数位毫无意义 | 对应点来自沿特征法线**实测**的亚像素边缘位置，与预测点分离；再做稳健相似变换最小二乘 |
 | 5 | `magnitude > 0` 即算命中 | 噪声与纹理也计分，误报严重（空场景曾报出 5 个目标） | 三重门：`score = coverage^(1/N)` 与 `AcceptThreshold` 比较、`ContrastThreshold` 对比度门限、粗层 `CoarseAcceptThreshold` 预筛，外加 clutter 惩罚 |
-| 6 | `BuildChains` 最近邻增长 O(n²) | 数千边缘点即不可用 | 空间哈希 + BFS 洪泛（`PatMaxTool.BuildChains`），近线性 |
+| 6 | `BuildChains` 最近邻增长 O(n²) | 数千边缘点即不可用 | 空间哈希 + BFS 洪泛（`ShapeAnchorTool.BuildChains`），近线性 |
 | 7 | UI 的 `ScaleMin/Max` 从未传给算法 | 尺度搜索形同虚设 | `BuildOptions` 把每个公开参数逐项映射进 `SearchOptions`，含尺度区间 |
 | 8 | 没有任何测试或基准，README 里的性能数字不可复现 | 改动的方向无从判断 | 新增 `Benchmarks`（合成真值渲染、精度与性能套件、真图验证）、`--selftest` 门禁退出码、双平台 CI |
 
@@ -296,7 +299,7 @@
 ## 11. 项目结构
 
 ```
-PatMaxSharp/
+ShapeAnchor/
 ├── Core/        GrayImage, RectI, PngReader, PatternModel, PatternMulti, Dipole
 ├── Edge/        GaborEdgeDetector（DoG 主路径 + Gabor 保真路径）
 ├── Matching/    SearchPyramid, SearchEngine, Scorer, PeakDetector, SearchOptions, MatchResult
@@ -309,15 +312,15 @@ PatMaxSharp/
 ├── tools/cognex-meta/  元数据导出工具（可复现取证）
 ├── .github/workflows/ci.yml
 ├── Program.cs   CLI：演示 / --selftest / --bench / --cal <目录>
-└── PatMaxSharp.UI/  WPF 前端
+└── ShapeAnchor.UI/  WPF 前端
 ```
 
 ## 12. 快速开始
 
-> 应用图标 `PatMaxSharp.UI/Assets/patmax.ico`（16–256 多尺寸），生成脚本见 `docs/make_icon.py`。
+> 应用图标 `ShapeAnchor.UI/Assets/shapeanchor.ico`（16–256 多尺寸），生成脚本见 `docs/make_icon.py`。
 
 ```csharp
-var tool = new PatMaxSharp.PatMaxTool
+var tool = new ShapeAnchor.ShapeAnchorTool
 {
     AcceptThreshold = 0.6,
     RotationAngleMin = -30, RotationAngleMax = 30
@@ -339,7 +342,7 @@ foreach (var r in tool.Run(searchImage, 5))
 | `dotnet run -c Release -- --selftest` | 精度门禁，全过退出码 0，任一失败退出码 1 |
 | `dotnet run -c Release -- --bench` | 只跑性能 |
 | `dotnet run -c Release -- --cal <目录> [--ncc] [--no-autofloor] [--ignore-polarity]` | 对目录内 PNG/BMP 做真图验证 |
-| `dotnet run --project PatMaxSharp.UI -c Release` | WPF 前端 |
+| `dotnet run --project ShapeAnchor.UI -c Release` | WPF 前端 |
 
 ## 13. 覆盖范围
 
@@ -365,7 +368,7 @@ foreach (var r in tool.Run(searchImage, 5))
 | `dotnet run -c Release -- --bench` | 第 7 节两张表（整帧搜索 + 边缘前端） |
 | `dotnet run -c Release` | 同一套精度与性能表，外加 DoG 核常数、1D 卷积脉冲响应、仿射拟合与 TPS 演示 |
 | `dotnet run -c Release -- --cal <目录>` | 第 8 节真图验证（命中数、score、原点网格、单帧耗时） |
-| `dotnet run --project PatMaxSharp.UI -c Release` | WPF 前端（训练区域、参数面板、搜索与结果叠加） |
+| `dotnet run --project ShapeAnchor.UI -c Release` | WPF 前端（训练区域、参数面板、搜索与结果叠加） |
 | `.github/workflows/ci.yml` | ubuntu + windows 构建核心库并跑 `--selftest`；Windows 额外构建 WPF |
 
 第 7 节的数字与本机 CPU / 线程数相关（i9-12950HX / 24 线程）；第 6 节的精度数字与机器无关，换机器跑出的误差应当处于同一量级。

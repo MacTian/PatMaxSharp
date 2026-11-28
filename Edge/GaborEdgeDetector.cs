@@ -1,8 +1,8 @@
 using System.Numerics;
 using System.Threading.Tasks;
-using PatMaxSharp.Core;
+using ShapeAnchor.Core;
 
-namespace PatMaxSharp.Edge;
+namespace ShapeAnchor.Edge;
 
 /// <summary>Which operator produces the gradient field.</summary>
 public enum EdgeMethod

@@ -1,7 +1,7 @@
-using PatMaxSharp.Core;
-using PatMaxSharp.Edge;
+using ShapeAnchor.Core;
+using ShapeAnchor.Edge;
 
-namespace PatMaxSharp.Training;
+namespace ShapeAnchor.Training;
 
 /// <summary>
 /// Training controls.

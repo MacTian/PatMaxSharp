@@ -10,19 +10,19 @@ using System.Linq;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
-using PatMaxSharp;
-using PatMaxSharp.Core;
-using PatMaxSharp.Training;
-using PatMaxSharp.UI.Controls;
+using ShapeAnchor;
+using ShapeAnchor.Core;
+using ShapeAnchor.Training;
+using ShapeAnchor.UI.Controls;
 
-namespace PatMaxSharp.UI.ViewModels;
+namespace ShapeAnchor.UI.ViewModels;
 
 /// <summary>
 /// Main view model — binds the whole PatMax UI.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged
 {
-    private readonly PatMaxTool _tool = new();
+    private readonly ShapeAnchorTool _tool = new();
     private BitmapSource _image;
     private string _status = "就绪";
     private Rect? _trainRegion;
@@ -63,7 +63,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ParameterPreset SelectedPreset { get; set; }
 
     private string PresetDir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PatMaxSharp", "Presets");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShapeAnchor", "Presets");
 
     private static bool IsBuiltIn(ParameterPreset p) =>
         ParameterPreset.BuiltIn().Any(b => b.Name == p.Name);

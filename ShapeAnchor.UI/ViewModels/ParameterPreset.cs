@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace PatMaxSharp.UI.ViewModels;
+namespace ShapeAnchor.UI.ViewModels;
 
 /// <summary>
 /// A saved set of PatMax parameters (preset).
@@ -60,7 +60,7 @@ public sealed class ParameterPreset
     /// `dotnet run -- --presets <folder>` measures. Nothing here is hand-tuned twice.
     /// </summary>
     public static List<ParameterPreset> BuiltIn() =>
-        PatMaxSharp.Core.PresetCatalog.BuiltIn.Select(p => new ParameterPreset
+        ShapeAnchor.Core.PresetCatalog.BuiltIn.Select(p => new ParameterPreset
         {
             Name = p.Name,
             Description = $"{p.Description}。{p.Usage}",

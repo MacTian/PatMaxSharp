@@ -1,4 +1,4 @@
-# PatMaxSharp
+# ShapeAnchor
 
 **C# 实现的 Cognex PatMax (PMAlign) 对标工程 —— 训练图上一个区域，在任意搜索图中定位该目标，输出亚像素位置、角度、尺度。**
 **A C# work-alike of Cognex PatMax (PMAlign) — train one region, locate that target in any search image, return a sub-pixel position, angle and scale.**
@@ -21,7 +21,7 @@
 ## 快速开始 / Quick start
 
 ```csharp
-var tool = new PatMaxSharp.PatMaxTool
+var tool = new ShapeAnchor.ShapeAnchorTool
 {
     AcceptThreshold = 0.6,
     RotationAngleMin = -30, RotationAngleMax = 30
@@ -38,7 +38,7 @@ dotnet run -c Release                 # 演示 + 精度 + 性能 / demo + accura
 dotnet run -c Release -- --selftest   # 门禁，10 用例 / gate, 10 cases
 dotnet run -c Release -- --bench      # 只跑性能 / performance only
 dotnet run -c Release -- --cal <目录>  # 真图验证 / real-image check
-dotnet run --project PatMaxSharp.UI -c Release   # WPF 前端 / WPF front end
+dotnet run --project ShapeAnchor.UI -c Release   # WPF 前端 / WPF front end
 ```
 
 ## 流水线 / Pipeline

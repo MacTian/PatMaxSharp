@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using PatMaxSharp.Core;
-using PatMaxSharp.Training;
+using ShapeAnchor.Core;
+using ShapeAnchor.Training;
 
-namespace PatMaxSharp.Benchmarks;
+namespace ShapeAnchor.Benchmarks;
 
 /// <summary>
 /// Runs the matcher over a folder of real images (PNG or BMP): trains on the first image and
@@ -29,7 +29,7 @@ public static class CalibrationCheck
         var files = ImageLoader.Enumerate(directory);
         if (files.Count < 2) { Console.WriteLine("[cal] need at least two PNG/BMP files"); return; }
 
-        var detector = new PatMaxSharp.Edge.GaborEdgeDetector { AutoNoiseFloor = autoNoiseFloor };
+        var detector = new ShapeAnchor.Edge.GaborEdgeDetector { AutoNoiseFloor = autoNoiseFloor };
         var baseImage = ImageLoader.Load(files[0]);
         if (preview) DumpPreview(baseImage, files[0]);
 
@@ -39,7 +39,7 @@ public static class CalibrationCheck
         Console.WriteLine($"[cal] base    = {Path.GetFileName(files[0])}  {baseImage.Width}x{baseImage.Height}  " +
                           $"content bbox = {roi}");
 
-        var tool = new PatMaxTool(detector)
+        var tool = new ShapeAnchorTool(detector)
         {
             AcceptThreshold = 0.5,
             CoarseAcceptThreshold = 0.33,

@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace PatMaxSharp.Core;
+namespace ShapeAnchor.Core;
 
 /// <summary>
 /// Minimal BMP reader (1/4/8-bit indexed, 16/24/32-bit BI_RGB, bottom-up or top-down).

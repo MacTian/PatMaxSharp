@@ -1,12 +1,12 @@
 using System.Diagnostics;
-using PatMaxSharp.Core;
-using PatMaxSharp.Edge;
-using PatMaxSharp.Fit;
-using PatMaxSharp.Matching;
-using PatMaxSharp.Projection;
-using PatMaxSharp.Training;
+using ShapeAnchor.Core;
+using ShapeAnchor.Edge;
+using ShapeAnchor.Fit;
+using ShapeAnchor.Matching;
+using ShapeAnchor.Projection;
+using ShapeAnchor.Training;
 
-namespace PatMaxSharp;
+namespace ShapeAnchor;
 
 /// <summary>
 /// PatMax (PMAlign) work-alike: train a pattern from a region, then locate instances of it.
@@ -21,7 +21,7 @@ namespace PatMaxSharp;
 /// The public surface stays compatible with the earlier revision (Train/Run/Pattern and the
 /// parameter properties), because the WPF front end binds to it directly.
 /// </summary>
-public sealed class PatMaxTool
+public sealed class ShapeAnchorTool
 {
     /// <summary>Edge detector shared by training and search (owns the noise floor and the Gabor settings).</summary>
     public GaborEdgeDetector EdgeDetector { get; }
@@ -162,13 +162,13 @@ public sealed class PatMaxTool
     }
 
     /// <summary>Create a tool with a default <see cref="GaborEdgeDetector"/>.</summary>
-    public PatMaxTool()
+    public ShapeAnchorTool()
     {
         EdgeDetector = new GaborEdgeDetector();
     }
 
     /// <summary>Create a tool that shares an existing edge detector (its settings are then live).</summary>
-    public PatMaxTool(GaborEdgeDetector detector)
+    public ShapeAnchorTool(GaborEdgeDetector detector)
     {
         EdgeDetector = detector;
     }

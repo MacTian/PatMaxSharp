@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace PatMaxSharp.UI;
+namespace ShapeAnchor.UI;
 
 public partial class App : Application
 {

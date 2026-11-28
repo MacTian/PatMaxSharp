@@ -1,4 +1,4 @@
-<UserControl x:Class="PatMaxSharp.UI.Controls.ImageRegionSelector"
+<UserControl x:Class="ShapeAnchor.UI.Controls.ImageRegionSelector"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="Black">

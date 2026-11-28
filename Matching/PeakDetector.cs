@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Matching;
+namespace ShapeAnchor.Matching;
 
 /// <summary>
 /// 2D peak / non-maximum-suppression utilities for the correlation surface.

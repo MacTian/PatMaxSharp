@@ -1,6 +1,6 @@
-<img src="docs/icon.png" width="76" align="right" alt="PatMaxSharp">
+<img src="docs/icon.png" width="76" align="right" alt="ShapeAnchor">
 
-# PatMaxSharp — a C# work-alike of Cognex PatMax (PMAlign)
+# ShapeAnchor — a geometric feature matcher written from scratch in C#
 
 Train one region of a training image, then locate that target in any search image and return a sub-pixel position, angle and scale. An independent implementation: it does not link to or call `cogxpma.dll` / `Cognex.VisionPro.PMAlign.dll`.
 10/10 synthetic-truth cases PASS: position error ≤ 0.10 px, angle error ≤ 0.12°, scale error ≤ 0.0017.
@@ -55,7 +55,7 @@ The previous revision compiled and produced output, but the algorithm did not ac
 | 3 | The template was a sliding window over the whole training image | The window had exactly one legal position, so the match result was **always the training origin**; translation, rotation and occlusion tests all returned the same coordinates | The template became a sparse feature set (position, unit normal, polarity, strength) correlated over a search-image pyramid, so a peak can land anywhere |
 | 4 | The pose fit used the same predicted points as both source and target | The fit was always the identity transform, so pose decimals were meaningless | Correspondences come from sub-pixel edge positions **measured** along each feature normal, separate from the predicted points, followed by a robust similarity least-squares fit |
 | 5 | Any `magnitude > 0` counted as a hit | Noise and texture scored too, causing heavy false positives (an empty scene once reported 5 targets) | Three gates: `score = coverage^(1/N)` against `AcceptThreshold`, a `ContrastThreshold` gate, and a coarse-stage `CoarseAcceptThreshold` prefilter, plus a clutter penalty |
-| 6 | `BuildChains` grew by nearest neighbour, O(n²) | Unusable beyond a few thousand edge points | Spatial hash + BFS flood fill (`PatMaxTool.BuildChains`), near linear |
+| 6 | `BuildChains` grew by nearest neighbour, O(n²) | Unusable beyond a few thousand edge points | Spatial hash + BFS flood fill (`ShapeAnchorTool.BuildChains`), near linear |
 | 7 | The UI's `ScaleMin/Max` were never passed to the algorithm | Scale search was decorative | `BuildOptions` maps every public parameter into `SearchOptions`, scale range included |
 | 8 | No tests and no benchmarks; the README's performance numbers were not reproducible | No way to tell whether a change helped or hurt | Added `Benchmarks` (synthetic ground-truth rendering, accuracy and performance suites, real-image check), a `--selftest` exit-code gate, and two-platform CI |
 
@@ -277,7 +277,7 @@ One statement has to be made explicitly: the native core `cogxpma.dll` is WIBU-p
 ## 11. Project layout
 
 ```
-PatMaxSharp/
+ShapeAnchor/
 ├── Core/        GrayImage, RectI, PngReader, PatternModel, PatternMulti, Dipole
 ├── Edge/        GaborEdgeDetector (DoG main path + Gabor fidelity path)
 ├── Matching/    SearchPyramid, SearchEngine, Scorer, PeakDetector, SearchOptions, MatchResult
@@ -290,13 +290,13 @@ PatMaxSharp/
 ├── tools/cognex-meta/  metadata export tool (reproducible forensics)
 ├── .github/workflows/ci.yml
 ├── Program.cs   CLI: demo / --selftest / --bench / --cal <directory>
-└── PatMaxSharp.UI/  WPF front end
+└── ShapeAnchor.UI/  WPF front end
 ```
 
 ## 12. Quick start
 
 ```csharp
-var tool = new PatMaxSharp.PatMaxTool
+var tool = new ShapeAnchor.ShapeAnchorTool
 {
     AcceptThreshold = 0.6,
     RotationAngleMin = -30, RotationAngleMax = 30
@@ -318,7 +318,7 @@ Command line:
 | `dotnet run -c Release -- --selftest` | Accuracy gate; exit code 0 when all pass, 1 when any fails |
 | `dotnet run -c Release -- --bench` | Performance only |
 | `dotnet run -c Release -- --cal <directory>` | Real-image check over the PNGs in a folder |
-| `dotnet run --project PatMaxSharp.UI -c Release` | WPF front end |
+| `dotnet run --project ShapeAnchor.UI -c Release` | WPF front end |
 
 ## 13. Coverage
 
@@ -344,7 +344,7 @@ Which command produces which table:
 | `dotnet run -c Release -- --bench` | Both tables in Section 7 (full search + edge front end) |
 | `dotnet run -c Release` | The same accuracy and performance tables, plus DoG kernel constants, the 1D convolution impulse response, and the affine-fit and TPS demos |
 | `dotnet run -c Release -- --cal <directory>` | The real-image check in Section 8 (hit count, score, origin grid, per-frame time) |
-| `dotnet run --project PatMaxSharp.UI -c Release` | The WPF front end (region training, parameter panel, search and result overlay) |
+| `dotnet run --project ShapeAnchor.UI -c Release` | The WPF front end (region training, parameter panel, search and result overlay) |
 | `.github/workflows/ci.yml` | Builds the core library and runs `--selftest` on ubuntu + windows; builds the WPF front end on Windows |
 
 The Section 7 figures depend on CPU and thread count (i9-12950HX / 24 threads); the Section 6 accuracy figures are machine-independent — a different machine should land in the same order of magnitude.

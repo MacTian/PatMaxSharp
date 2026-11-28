@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Matching;
+namespace ShapeAnchor.Matching;
 
 /// <summary>
 /// Search parameters, named after the CogPMAlignRunParams surface.

@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using PatMaxSharp.Core;
-using PatMaxSharp.Matching;
+using ShapeAnchor.Core;
+using ShapeAnchor.Matching;
 
-namespace PatMaxSharp.Benchmarks;
+namespace ShapeAnchor.Benchmarks;
 
 /// <summary>
 /// Accuracy + performance suite with exact ground truth. Used by `--selftest` in CI and by
@@ -24,9 +24,9 @@ public static class BenchmarkSuite
         public double FoundX, FoundY, FoundAngleDeg, FoundScale;
     }
 
-    private static PatMaxTool CreateTool()
+    private static ShapeAnchorTool CreateTool()
     {
-        var tool = new PatMaxTool
+        var tool = new ShapeAnchorTool
         {
             AcceptThreshold = 0.5,
             ContrastThreshold = 0.05,
@@ -48,13 +48,13 @@ public static class BenchmarkSuite
         return tool;
     }
 
-    private static PatternModel TrainBase(PatMaxTool tool)
+    private static PatternModel TrainBase(ShapeAnchorTool tool)
     {
         var baseImg = SyntheticPart.Base();
         return tool.TrainRegion(baseImg, new RectI(0, 0, baseImg.Width, baseImg.Height));
     }
 
-    private static Case Measure(string name, PatMaxTool tool, GrayImage scene,
+    private static Case Measure(string name, ShapeAnchorTool tool, GrayImage scene,
         double truthX, double truthY, double truthAngleDeg, double truthScale,
         double posTol = 0.25, double angTol = 0.25, double scaleTol = 0.015)
     {

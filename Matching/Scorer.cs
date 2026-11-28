@@ -1,6 +1,6 @@
-using PatMaxSharp.Core;
+using ShapeAnchor.Core;
 
-namespace PatMaxSharp.Matching;
+namespace ShapeAnchor.Matching;
 
 /// <summary>
 /// PatMax scoring.

@@ -6,19 +6,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <AssemblyName>PatMaxSharp</AssemblyName>
-    <RootNamespace>PatMaxSharp</RootNamespace>
+    <AssemblyName>ShapeAnchor</AssemblyName>
+    <RootNamespace>ShapeAnchor</RootNamespace>
   </PropertyGroup>
 
   <!-- The WPF UI is a separate project; do not compile its sources here.
        tools/ holds standalone analyser projects with their own obj/bin output. -->
   <ItemGroup>
-    <Compile Remove="PatMaxSharp.UI\**" />
-    <Compile Remove="PatMaxSharp.CalTest\**" />
+    <Compile Remove="ShapeAnchor.UI\**" />
+    <Compile Remove="ShapeAnchor.CalTest\**" />
     <Compile Remove="tools\**" />
     <Compile Remove="docs\**" />
-    <None Remove="PatMaxSharp.UI\**" />
-    <None Remove="PatMaxSharp.CalTest\**" />
+    <None Remove="ShapeAnchor.UI\**" />
+    <None Remove="ShapeAnchor.CalTest\**" />
     <None Remove="tools\**" />
     <None Remove="docs\**" />
   </ItemGroup>

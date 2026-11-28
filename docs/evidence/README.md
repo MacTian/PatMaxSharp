@@ -8,7 +8,7 @@ Constant 表里的枚举值、原生 PE 的节表与明文 `.rsrc` 字符串。
 
 ## 1. 这个目录是什么，为什么存在
 
-PatMaxSharp 是一个独立的 PatMax / PMAlign 形状匹配实现。为了让**评分函数与参数设计**与业内
+ShapeAnchor 是一个独立的 PatMax / PMAlign 形状匹配实现。为了让**评分函数与参数设计**与业内
 公开可见的行为对齐，作者以**本机安装的 Cognex VisionPro**（`C:\Program Files\Cognex\VisionPro`）
 作为工程对照对象，用只读方式记录它的外部契约：有哪些参数、默认值是多少、合法范围是什么、
 枚举怎么取值、结果字段是什么语义、边缘前处理的默认核参数是多少。

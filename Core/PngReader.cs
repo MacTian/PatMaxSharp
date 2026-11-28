@@ -1,6 +1,6 @@
 using System.IO.Compression;
 
-namespace PatMaxSharp.Core;
+namespace ShapeAnchor.Core;
 
 /// <summary>
 /// Minimal PNG reader (8/16-bit, non-interlaced, colour types 0/2/3/4/6).

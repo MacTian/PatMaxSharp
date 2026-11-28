@@ -1,6 +1,6 @@
-using PatMaxSharp.Core;
+using ShapeAnchor.Core;
 
-namespace PatMaxSharp;
+namespace ShapeAnchor;
 
 /// <summary>
 /// One match result.

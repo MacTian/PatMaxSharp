@@ -5,14 +5,14 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Nullable>disable</Nullable>
-    <AssemblyName>PatMaxSharp.UI</AssemblyName>
-    <RootNamespace>PatMaxSharp.UI</RootNamespace>
+    <AssemblyName>ShapeAnchor.UI</AssemblyName>
+    <RootNamespace>ShapeAnchor.UI</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\patmax.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\shapeanchor.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PatMaxSharp.csproj" />
+    <ProjectReference Include="..\ShapeAnchor.csproj" />
   </ItemGroup>
 
 </Project>

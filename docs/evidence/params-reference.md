@@ -1,4 +1,4 @@
-# PMAlign 参数语义与默认值表 + 与 PatMaxSharp 现有实现的三类比对
+# PMAlign 参数语义与默认值表 + 与 ShapeAnchor 现有实现的三类比对
 
 本文所有数字都来自**静态取证**，没有运行 VisionPro、没有反编译第三方源码。
 
@@ -233,38 +233,38 @@
 
 ---
 
-## 9. 与 PatMaxSharp 现有公开 API 的三类比对
+## 9. 与 ShapeAnchor 现有公开 API 的三类比对
 
-比对基准（仓库内实际代码，已按当前 HEAD 复核一遍，含 `PatMaxTool` 新增的 `NoiseFloor` 别名）：
-`PatMaxTool.cs`、`Matching/SearchOptions.cs`、`Matching/Scorer.cs`、`Matching/PeakDetector.cs`、
+比对基准（仓库内实际代码，已按当前 HEAD 复核一遍，含 `ShapeAnchorTool` 新增的 `NoiseFloor` 别名）：
+`ShapeAnchorTool.cs`、`Matching/SearchOptions.cs`、`Matching/Scorer.cs`、`Matching/PeakDetector.cs`、
 `Matching/MatchResult.cs`、`Core/PatternModel.cs`、`Training/PatternTrainer.cs`、
 `Edge/GaborEdgeDetector.cs`、`Projection/*`。
 
-> 复核结论：`PatMaxTool` 的公开参数与默认值（`AcceptThreshold = 0.5`、`ContrastThreshold = 0.08`、
+> 复核结论：`ShapeAnchorTool` 的公开参数与默认值（`AcceptThreshold = 0.5`、`ContrastThreshold = 0.08`、
 > `RotationAngleMin/Max = ∓180`、`ScaleMin/Max = 1.0`、`TrainMaxFeatures = 600`、`MaxLevels = 4` 等）
 > 与本次比对时一致，仅多了 `NoiseFloor` 透传属性，故下表结论不变。
 
 ### 9.1 已实现（名称与语义都对得上）
 
-| VisionPro | PatMaxSharp | 备注 |
+| VisionPro | ShapeAnchor | 备注 |
 |---|---|---|
-| `AcceptThreshold = 0.5` | `PatMaxTool.AcceptThreshold = 0.5`、`SearchOptions.AcceptThreshold = 0.5`、`Scorer.AcceptThreshold = 0.5` | 默认值完全一致 |
-| `ScoreUsingClutter = true` | `PatMaxTool.UseClutter = true`、`SearchOptions.UseClutter = true` | 一致 |
-| `Timeout` / `TimeoutEnabled(false)` | `PatMaxTool.TimeoutMs = 0`（禁用） | 效果等价（默认不超时） |
+| `AcceptThreshold = 0.5` | `ShapeAnchorTool.AcceptThreshold = 0.5`、`SearchOptions.AcceptThreshold = 0.5`、`Scorer.AcceptThreshold = 0.5` | 默认值完全一致 |
+| `ScoreUsingClutter = true` | `ShapeAnchorTool.UseClutter = true`、`SearchOptions.UseClutter = true` | 一致 |
+| `Timeout` / `TimeoutEnabled(false)` | `ShapeAnchorTool.TimeoutMs = 0`（禁用） | 效果等价（默认不超时） |
 | `GrainLimitFine/Coarse` 的"粒度"概念 | `PatternModel.Grain = 1.0`、`TrainOptions.Grain` | 概念有，结构不是一对 |
 | `Score` / `Coverage` / `FitError` / `Contrast` 结果字段 | `MatchResult.Score/.Coverage/.FitError/.Contrast` | 字段齐全 |
-| `MaxResults`（`ApproximateNumberToFind` 的近似） | `PatMaxTool.Run(image, maxResults)`、`SearchOptions.MaxResults = 1` | 默认 1 与 `ApproximateNumberToFind = 1` 一致，但语义是"硬上限"而非"期望数" |
+| `MaxResults`（`ApproximateNumberToFind` 的近似） | `ShapeAnchorTool.Run(image, maxResults)`、`SearchOptions.MaxResults = 1` | 默认 1 与 `ApproximateNumberToFind = 1` 一致，但语义是"硬上限"而非"期望数" |
 | 形状模型/多模型 | `PatternMulti`、`MultiRunMode` | 结构存在 |
 | PatFlex 类形变拟合 | `Transform/XformTps.cs`（TPS） | 有替代实现，参数未对齐 |
 | 边缘检测核心常量 | `GaborEdgeDetector.DefaultSigmaX = 2.0506096654409878`、`DefaultSensitivityParameter = 2.0` | **这两个常量被我这次取证证实**（见 `native-strings.md` §8） |
 
 ### 9.2 语义不符（有，但意思/单位/默认值不同 -- 优先级最高）
 
-| # | 项目 | VisionPro（实测） | PatMaxSharp（现状） | 差异性质 |
+| # | 项目 | VisionPro（实测） | ShapeAnchor（现状） | 差异性质 |
 |---|---|---|---|---|
 | D1 | `ContrastThreshold` 的量纲 | `10`，单位=8-bit 像素梯度，范围 0…65535 | `0.08`，归一化 0…1；已真正用作接受门限（`Matching/SearchEngine.cs:643` `contrast >= opt.ContrastThreshold`） | **量纲差 ~125×**。判据方向已经对了，但数值不能直接照搬 VisionPro 的 10，也无法互相换算 |
-| D2 | 角度搜索范围 | `ZoneAngle.Low/High = ∓π/4`（±45°），且 `Configuration=Nominal` 时默认**不搜** | `RotationAngleMin/Max = ∓180°`，默认全搜 | 默认行为相反：VisionPro 默认不转，PatMaxSharp 默认搜满 360° |
-| D3 | 尺度搜索范围 | `ZoneScale.Low/High = 0.8/1.2`（±20%） | `ScaleMin/Max = 1.0/1.0` | 默认行为相反：VisionPro 默认允许 ±20%，PatMaxSharp 默认锁死 1.0 |
+| D2 | 角度搜索范围 | `ZoneAngle.Low/High = ∓π/4`（±45°），且 `Configuration=Nominal` 时默认**不搜** | `RotationAngleMin/Max = ∓180°`，默认全搜 | 默认行为相反：VisionPro 默认不转，ShapeAnchor 默认搜满 360° |
+| D3 | 尺度搜索范围 | `ZoneScale.Low/High = 0.8/1.2`（±20%） | `ScaleMin/Max = 1.0/1.0` | 默认行为相反：VisionPro 默认允许 ±20%，ShapeAnchor 默认锁死 1.0 |
 | D4 | 重叠抑制 | `XYOverlap = 0.8`（**面积重叠比例**，且要求所有 DOF 同时重叠才丢弃） | `SearchOptions.OverlapSuppression = 0.55`（单一阈值） | 数值不同（0.8 vs 0.55）且判据少了"所有 DOF 都重叠"这一半条件 |
 | D5 | `TrainAlgorithm` 默认值 | `2 = PatMaxAndPatQuick` | `PatternModel.TrainAlgorithm = 0`（裸 `int`，无枚举） | 默认值不同；且缺枚举，可读性与可校验性都差 |
 | D6 | `MinAcceptablePeakFallOff = 4.0` | VisionPro 无同名公开参数（无可对照） | 绝对单位的落差判据（`v - neighbor < 4.0`，`Matching/PeakDetector.cs`），而 `ProjectionMethod.Project` 返回的是**沿搜索方向累加的原始梯度**，量级随 `searchLength` 线性变化 | 参数含义随调用参数漂移，等于不可标定；建议改成相对落差 |
@@ -273,8 +273,8 @@
 **已在当前版本修复**（复核确认，早期修订版确实存在这两个问题，供你判断是否需要回退说明）：
 
 - 评分不再是"两个旋钮"：`Scorer.Score(...)` 现在接收 `exponent` 形参，
-  `Matching/SearchEngine.cs:624-627` 传 `1 / Math.Max(1.0, model.N)`，而 `model.N = PatMaxTool.ScoreExponentN`
-  （`PatMaxTool.cs:134`），单一来源。
+  `Matching/SearchEngine.cs:624-627` 传 `1 / Math.Max(1.0, model.N)`，而 `model.N = ShapeAnchorTool.ScoreExponentN`
+  （`ShapeAnchorTool.cs:134`），单一来源。
 - `Scorer.ScoreBreakdown` 已没有 `Contrast` 字段（现在只有 `Score, Coverage, ClutterPenalty, Matched, Total`），
   不存在"Contrast 被填成 coverage"的问题；`MatchResult.Contrast` 由 `SearchEngine.cs:630`
   的 `contrastSum / matched * invRef` 真实计算。

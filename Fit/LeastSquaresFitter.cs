@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Fit;
+namespace ShapeAnchor.Fit;
 
 /// <summary>
 /// Closed-form least-squares pose estimators.

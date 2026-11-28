@@ -1,4 +1,4 @@
-namespace PatMaxSharp.Projection;
+namespace ShapeAnchor.Projection;
 
 /// <summary>
 /// 1D Derivative-of-Gaussian kernel — the PatMax matching kernel.

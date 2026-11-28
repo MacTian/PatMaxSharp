@@ -25,11 +25,11 @@ jobs:
       # The WPF front end only builds on Windows, so the gate builds the core library
       # explicitly and runs the headless accuracy suite on both platforms.
       - name: Build core
-        run: dotnet build PatMaxSharp.csproj -c Release
+        run: dotnet build ShapeAnchor.csproj -c Release
 
       - name: Accuracy self-test
-        run: dotnet run --project PatMaxSharp.csproj -c Release --no-build -- --selftest
+        run: dotnet run --project ShapeAnchor.csproj -c Release --no-build -- --selftest
 
       - name: Build WPF UI
         if: runner.os == 'Windows'
-        run: dotnet build PatMaxSharp.UI/PatMaxSharp.UI.csproj -c Release
+        run: dotnet build ShapeAnchor.UI/ShapeAnchor.UI.csproj -c Release

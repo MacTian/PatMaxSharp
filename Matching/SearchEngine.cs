@@ -1,9 +1,9 @@
 using System.Diagnostics;
-using PatMaxSharp.Core;
-using PatMaxSharp.Edge;
-using PatMaxSharp.Fit;
+using ShapeAnchor.Core;
+using ShapeAnchor.Edge;
+using ShapeAnchor.Fit;
 
-namespace PatMaxSharp.Matching;
+namespace ShapeAnchor.Matching;
 
 /// <summary>
 /// Coarse-to-fine PatMax-style search engine.
