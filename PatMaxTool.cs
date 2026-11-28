@@ -194,6 +194,9 @@ public sealed class PatMaxTool
         return Train(image, r, r.X + (r.Width - 1) / 2.0, r.Y + (r.Height - 1) / 2.0, grain);
     }
 
+    /// <summary>Drop the trained model (清空). A subsequent Run refuses until training again.</summary>
+    public void ClearPattern() => Pattern = null;
+
     // ------------------------------------------------------------------
     //  Running
     // ------------------------------------------------------------------

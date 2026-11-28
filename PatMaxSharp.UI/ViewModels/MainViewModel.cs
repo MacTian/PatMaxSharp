@@ -212,6 +212,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(CanTrain));
                 OnPropertyChanged(nameof(TrainRegionText));
+                OnPropertyChanged(nameof(OriginPoint));
                 System.Windows.Input.CommandManager.InvalidateRequerySuggested();
                 if (value.HasValue && OriginFollowsCenter) SnapOriginToCenter();
                 // drawing a new region brings the green overlay back
@@ -955,11 +956,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void Clear()
     {
+        // Everything the canvas draws has to be reset here: result rows, markers, the model
+        // overlay and the regions. Clearing only the regions left the match overlay behind.
         Results.Clear();
+        Markers = new List<MatchMarker>();
+        PatternOutline = new List<OutlineFeature>();
+        OnPropertyChanged(nameof(PatternOutline));
+
+        _tool.ClearPattern();
         Trained = false;
+
         TrainRegion = null;
         SearchRegion = null;
-        Status = "已清空";
+
+        ProcessingTimeMs = 0;
+        ThroughputMpxs = 0;
+        OnPropertyChanged(nameof(ProcessingTimeMs));
+        OnPropertyChanged(nameof(ThroughputMpxs));
+        Status = "已清空（图像保留，可重新框选）";
     }
 
     // ---- Image helpers ----
