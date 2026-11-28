@@ -760,6 +760,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>Load an image by path. Also used for a path given on the command line.</summary>
+    /// <summary>
+    /// Regression check for "loading a new image must clear the previous overlay": loads the first
+    /// image, plants a marker/result as a run would, loads the second, and reports what is left.
+    /// </summary>
+    public string VerifyLoadClearsOverlay(string first, string second)
+    {
+        LoadImageFile(first);
+        Markers = new List<MatchMarker> { new() { X = 1, Y = 1, Accepted = true } };
+        Results.Add(new MatchResult { ModelId = "planted", Score = 1.0, Accepted = true });
+        int beforeMarkers = Markers.Count, beforeResults = Results.Count;
+
+        LoadImageFile(second);
+        return $"before: markers={beforeMarkers} results={beforeResults} | " +
+               $"after: markers={Markers.Count} results={Results.Count} " +
+               $"selection={(SelectedResult == null ? "null" : "set")} time={ProcessingTimeMs:F1}ms";
+    }
+
     public void LoadImageFile(string path)
     {
         try
@@ -777,9 +794,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
             ResetMask();          // a mask belongs to one image: start from "all Care"
             MaskMode = false;
             Status = $"已加载: {System.IO.Path.GetFileName(path)} ({bmp.PixelWidth}×{bmp.PixelHeight})";
-            // Keep the trained model and parameters so the user can run directly
-            // on the new image. Results from the previous image are cleared.
+            // Keep the trained model and parameters so the user can run directly on the new image,
+            // but drop everything that belongs to the previous image: its result rows, the overlay
+            // that was drawn from them, the timing and the selection.
             Results.Clear();
+            Markers = new List<MatchMarker>();
+            SelectedResult = null;
+            ShowTrainRegion = true;
+            ProcessingTimeMs = 0;
+            ThroughputMpxs = 0;
+            OnPropertyChanged(nameof(ProcessingTimeMs));
+            OnPropertyChanged(nameof(ThroughputMpxs));
             OnPropertyChanged(nameof(Trained));
         }
         catch (Exception ex)

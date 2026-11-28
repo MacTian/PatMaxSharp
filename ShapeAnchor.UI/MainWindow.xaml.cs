@@ -41,6 +41,10 @@ public partial class MainWindow : Window
             _vm.TrainRegion = new Rect(double.Parse(args[3]), double.Parse(args[4]),
                                        double.Parse(args[5]), double.Parse(args[6]));
         }
+        else if (args.Length > 3 && args[1].Equals("--verify-clear", System.StringComparison.OrdinalIgnoreCase))
+        {
+            _vm.SetStatus(_vm.VerifyLoadClearsOverlay(args[2], args[3]));
+        }
         else if (args.Length > 1 && System.IO.File.Exists(args[1]))
             _vm.LoadImageFile(args[1]);
 
