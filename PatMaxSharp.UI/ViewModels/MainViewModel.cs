@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using PatMaxSharp;
 using PatMaxSharp.Core;
+using PatMaxSharp.Training;
 using PatMaxSharp.UI.Controls;
 
 namespace PatMaxSharp.UI.ViewModels;
@@ -34,6 +35,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         TrainCommand = new RelayCommand(_ => Train(), _ => _image != null && TrainRegion.HasValue);
         RunCommand = new RelayCommand(_ => Run(), _ => _trained && _image != null);
         ClearCommand = new RelayCommand(_ => Clear(), _ => _image != null);
+        BatchValidateCommand = new RelayCommand(_ => BatchValidate());
         SavePresetCommand = new RelayCommand(_ => SavePreset());
         NewPresetCommand = new RelayCommand(_ => NewPreset());
         DeletePresetCommand = new RelayCommand(_ => DeletePreset(), _ => SelectedPreset != null && !IsBuiltIn(SelectedPreset));
@@ -49,6 +51,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand TrainCommand { get; }
     public ICommand RunCommand { get; }
     public ICommand ClearCommand { get; }
+    public ICommand BatchValidateCommand { get; }
     public ICommand SavePresetCommand { get; }
     public ICommand NewPresetCommand { get; }
     public ICommand DeletePresetCommand { get; }
@@ -341,6 +344,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// </summary>
     public List<OutlineFeature> PatternOutline { get; private set; } = new();
 
+    /// <summary>CSV written by the last batch run (empty when none has run).</summary>
+    public string LastBatchCsv { get; private set; } = "";
+
     /// <summary>Last run processing time (ms).</summary>
     public double ProcessingTimeMs { get; private set; }
 
@@ -350,6 +356,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Currently selected result (highlights the marker on the image).</summary>
     public MatchResult SelectedResult { get; set; }
     #endregion
+
+    /// <summary>Set the status line from outside the view model (recording progress).</summary>
+    public void SetStatus(string text) => Status = text;
 
     private void OpenImage()
     {
@@ -422,6 +431,194 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             Status = $"训练失败: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Train on the first image of a folder and run every image in it, one row per image in the
+    /// results grid. This is how a whole capture set is judged: the numbers that drift between
+    /// frames are the ones worth arguing about.
+    /// </summary>
+    private void BatchValidate()
+    {
+        var dlg = new OpenFolderDialog { Title = "选择图片文件夹（第一张用作训练基准）" };
+        if (dlg.ShowDialog() != true) return;
+        RunBatch(dlg.FolderName);
+    }
+
+    /// <summary>Run the batch over a folder (also callable directly, e.g. for a scripted check).</summary>
+    public void RunBatch(string directory)
+    {
+        try
+        {
+            var files = ImageLoader.Enumerate(directory);
+            if (files.Count == 0)
+            {
+                Status = "该文件夹里没有 PNG / BMP 图片";
+                return;
+            }
+
+            var baseImage = ImageLoader.Load(files[0]);
+            var roi = PatternTrainer.ContentBounds(baseImage);
+
+            _tool.EdgeDetector.UseSimd = UseSimd;
+            _tool.EdgeDetector.UseParallel = UseParallel;
+            var pattern = _tool.Train(baseImage, roi, roi.X + (roi.Width - 1) / 2.0, roi.Y + (roi.Height - 1) / 2.0, Grain);
+
+            if (pattern.FeatureCount < 8)
+            {
+                Trained = false;
+                Status = $"批量失败: 基准图 {System.IO.Path.GetFileName(files[0])} 只训练出 {pattern.FeatureCount} 个特征";
+                return;
+            }
+            Trained = true;
+
+            ApplyParameters();
+            LoadImageFile(files[0]);          // show the base image and its model
+            Results.Clear();
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            int found = 0;
+            var csv = new System.Text.StringBuilder();
+            csv.AppendLine("image,score,x,y,angle_deg,scale,coverage,matched,bad,accepted,time_ms");
+
+            foreach (var file in files)
+            {
+                var gray = ImageLoader.Load(file);
+                var one = System.Diagnostics.Stopwatch.StartNew();
+                var r = _tool.Run(gray, 1);
+                one.Stop();
+                string name = System.IO.Path.GetFileName(file);
+
+                if (r.Count > 0)
+                {
+                    var m = r[0];
+                    m.ModelId = name;
+                    Results.Add(m);
+                    found++;
+                    csv.AppendLine($"{name},{m.Score:F3},{m.X:F2},{m.Y:F2},{m.AngleDegrees:F2}," +
+                                   $"{m.Scale:F3},{m.Coverage:P1},{m.MatchedFeatures},{m.BadFeatures}," +
+                                   $"{m.Accepted},{one.Elapsed.TotalMilliseconds:F1}");
+                }
+                else
+                {
+                    Results.Add(new MatchResult { ModelId = name + "  —  无结果", Score = 0, Accepted = false });
+                    csv.AppendLine($"{name},0,,,,,,,,{one.Elapsed.TotalMilliseconds:F1}");
+                }
+            }
+            watch.Stop();
+
+            // The grid only shows a handful of rows, so the whole run also lands in a file.
+            string csvPath = System.IO.Path.Combine(directory, "patmax_batch_results.csv");
+            System.IO.File.WriteAllText(csvPath, csv.ToString(), new System.Text.UTF8Encoding(false));
+            LastBatchCsv = csvPath;
+
+            OnPropertyChanged(nameof(Results));
+            ProcessingTimeMs = watch.Elapsed.TotalMilliseconds;
+            Status = $"批量完成: {found}/{files.Count} 张命中, 基准 {System.IO.Path.GetFileName(files[0])} " +
+                     $"({pattern.FeatureCount} 特征), 总计 {watch.ElapsedMilliseconds} ms → 已导出 {System.IO.Path.GetFileName(csvPath)}";
+        }
+        catch (Exception ex)
+        {
+            Status = $"批量失败: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Train on the first image of a folder, then walk the whole folder: load, match, hold for
+    /// <paramref name="dwellMs"/> so the overlay can be watched (or recorded), next. This is the
+    /// review loop - every frame shows the model features projected onto the part.
+    /// </summary>
+    public async System.Threading.Tasks.Task CycleFolderAsync(string directory, int dwellMs = 900,
+        Action<string> onImageDone = null)
+    {
+        try
+        {
+            var files = ImageLoader.Enumerate(directory);
+            if (files.Count == 0) { Status = "该文件夹里没有 PNG / BMP 图片"; return; }
+
+            var baseImage = ImageLoader.Load(files[0]);
+            var roi = PatternTrainer.ContentBounds(baseImage);
+            _tool.EdgeDetector.UseSimd = UseSimd;
+            _tool.EdgeDetector.UseParallel = UseParallel;
+            var pattern = _tool.Train(baseImage, roi, roi.X + (roi.Width - 1) / 2.0, roi.Y + (roi.Height - 1) / 2.0, Grain);
+            if (pattern.FeatureCount < 8)
+            {
+                Trained = false;
+                Status = $"循环失败: 基准图 {System.IO.Path.GetFileName(files[0])} 只训练出 {pattern.FeatureCount} 个特征";
+                return;
+            }
+            Trained = true;
+            ApplyParameters();
+
+            int index = 0;
+            foreach (var file in files)
+            {
+                index++;
+                var gray = ImageLoader.Load(file);
+                LoadImageFile(file);
+                await System.Threading.Tasks.Task.Delay(150);
+
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                var results = _tool.Run(gray, Math.Max(1, MaxResults));
+                watch.Stop();
+
+                Results.Clear();
+                var markers = new List<MatchMarker>();
+                foreach (var r in results)
+                {
+                    Results.Add(r);
+                    markers.Add(new MatchMarker
+                    {
+                        X = r.X, Y = r.Y, AngleDeg = r.AngleDegrees, Scale = r.Scale,
+                        Score = r.Score, Accepted = r.Accepted,
+                        Size = Math.Max(12, Math.Sqrt(Math.Max(1, r.MatchedFeatures)) * 1.5)
+                    });
+                }
+                Markers = markers;
+                if (_tool.Pattern != null)
+                {
+                    PatternOutline = _tool.Pattern.Featurelets
+                        .Select(f => new OutlineFeature
+                        {
+                            X = f.X - _tool.Pattern.OriginX, Y = f.Y - _tool.Pattern.OriginY,
+                            Nx = f.Nx, Ny = f.Ny
+                        })
+                        .ToList();
+                    OnPropertyChanged(nameof(PatternOutline));
+                }
+                ShowTrainRegion = false;
+                ProcessingTimeMs = watch.Elapsed.TotalMilliseconds;
+                OnPropertyChanged(nameof(Markers));
+                OnPropertyChanged(nameof(ProcessingTimeMs));
+                Status = $"[{index}/{files.Count}] {System.IO.Path.GetFileName(file)}  —  " +
+                         $"找到 {results.Count} 个结果, 耗时 {watch.ElapsedMilliseconds} ms";
+                onImageDone?.Invoke(file);
+                await System.Threading.Tasks.Task.Delay(Math.Max(200, dwellMs));
+            }
+
+            Status = $"循环结束: 共 {files.Count} 张（基准 {System.IO.Path.GetFileName(files[0])}, {pattern.FeatureCount} 特征）";
+        }
+        catch (Exception ex)
+        {
+            Status = $"循环失败: {ex.Message}";
+        }
+    }
+    /// <summary>Map the current parameter panel onto the tool (shared by Run and RunBatch).</summary>
+    private void ApplyParameters()
+    {
+        _tool.PrecisionStep = Math.Max(1, PrecisionStep);
+        _tool.SubpixelRefinement = SubpixelRefinement;
+        _tool.EnableClustering = EnableClustering;
+        _tool.ClusterRadius = ClusterRadius;
+        _tool.PreSmoothSigma = PreSmoothSigma;
+        _tool.AcceptThreshold = AcceptThreshold;
+        _tool.ContrastThreshold = ContrastThreshold;
+        _tool.RotationAngleMin = RotationAngleMin;
+        _tool.RotationAngleMax = RotationAngleMax;
+        _tool.ScaleMin = ScaleMin;
+        _tool.ScaleMax = ScaleMax;
+        _tool.MaxCandidates = Math.Clamp(Math.Max(8, MaxResults * 2), 8, 32);
+        _tool.UseClutter = ScoreUsingClutter;
     }
 
     private void Run()

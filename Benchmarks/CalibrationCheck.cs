@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using PatMaxSharp.Core;
+using PatMaxSharp.Training;
 
 namespace PatMaxSharp.Benchmarks;
 
@@ -28,11 +29,11 @@ public static class CalibrationCheck
         var baseImage = ImageLoader.Load(files[0]);
         if (preview) DumpPreview(baseImage, files[0]);
 
-        var roi = ContentBounds(baseImage, out byte threshold);
+        var roi = PatternTrainer.ContentBounds(baseImage);
         Console.WriteLine($"[cal] folder  = {directory}");
         Console.WriteLine($"[cal] images  = {files.Count}  ({string.Join(", ", ImageLoader.SupportedExtensions)})");
         Console.WriteLine($"[cal] base    = {Path.GetFileName(files[0])}  {baseImage.Width}x{baseImage.Height}  " +
-                          $"content bbox = {roi}  (threshold {threshold})");
+                          $"content bbox = {roi}");
 
         var tool = new PatMaxTool(detector)
         {

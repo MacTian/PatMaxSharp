@@ -221,6 +221,32 @@ public static class PatternTrainer
         return model;
     }
 
+    /// <summary>
+    /// Bounding box of the object in an image: everything above (min + fraction x range).
+    /// Used to train from a folder of images where the part position is not known in advance.
+    /// </summary>
+    public static RectI ContentBounds(GrayImage image, double fraction = 0.35)
+    {
+        byte min = 255, max = 0;
+        foreach (byte v in image.Data) { if (v < min) min = v; if (v > max) max = v; }
+        if (max <= min) return new RectI(0, 0, image.Width, image.Height);
+
+        byte threshold = (byte)(min + (max - min) * Math.Clamp(fraction, 0.0, 1.0));
+        int x0 = int.MaxValue, y0 = int.MaxValue, x1 = -1, y1 = -1;
+        for (int y = 0; y < image.Height; y++)
+            for (int x = 0; x < image.Width; x++)
+                if (image.Data[y * image.Width + x] > threshold)
+                {
+                    if (x < x0) x0 = x;
+                    if (y < y0) y0 = y;
+                    if (x > x1) x1 = x;
+                    if (y > y1) y1 = y;
+                }
+
+        if (x1 < 0) return new RectI(0, 0, image.Width, image.Height);
+        return RectI.FromLTRB(x0, y0, x1 + 1, y1 + 1);
+    }
+
     /// <summary>Separable Gaussian blur used for the coarse "grain" setting.</summary>
     public static GrayImage Blur(GrayImage src, double sigma)
     {

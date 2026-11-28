@@ -48,6 +48,8 @@
                 <Separator/>
                 <Button Content="清空" Command="{Binding ClearCommand}"/>
                 <Button Content="标定测试" Command="{Binding CalibrationTestCommand}"/>
+                            <Button Content="批量验证" Command="{Binding BatchValidateCommand}"
+                                    ToolTip="选一个文件夹：第一张训练，逐张搜索，每张一行结果"/>
                 <Separator/>
                 <TextBlock Text="状态:" Style="{StaticResource lbl}" Margin="8,0,0,0"/>
                 <TextBlock Text="{Binding Status}" Foreground="#4FC3F7" FontWeight="Bold"
@@ -192,8 +194,9 @@
             <!-- Image + results -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="220"/>
+                    <RowDefinition Height="*" MinHeight="140"/>
+                    <RowDefinition Height="6"/>
+                    <RowDefinition Height="420" MinHeight="120"/>
                 </Grid.RowDefinitions>
 
                 <!-- Image viewer -->
@@ -209,8 +212,12 @@
                         ImageHeight="{Binding ImagePixelHeight}"/>
                 </Border>
 
+                <!-- Drag to trade image height for result rows (a batch run puts one row per image here) -->
+                <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                              Height="6" Background="#3F3F46" ShowsPreview="False"/>
+
                 <!-- Results -->
-                <GroupBox Grid.Row="1" Header="匹配结果">
+                <GroupBox Grid.Row="2" Header="匹配结果">
                     <DataGrid x:Name="resultsGrid" ItemsSource="{Binding Results}" AutoGenerateColumns="False"
                               SelectedItem="{Binding SelectedResult}"
                               IsReadOnly="True" Background="#1E1E1E" Foreground="#EEE"
@@ -247,6 +254,7 @@
                         </DataGrid.Resources>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="#" Binding="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=Header}" Width="40"/>
+                            <DataGridTextColumn Header="图像" Binding="{Binding ModelId}" Width="110"/>
                             <DataGridTextColumn Header="得分 Score" Binding="{Binding Score, StringFormat=F3}" Width="90"/>
                             <DataGridTextColumn Header="相似度 Coverage" Binding="{Binding Coverage, StringFormat=P0}" Width="100"/>
                             <DataGridTextColumn Header="X" Binding="{Binding X, StringFormat=F1}" Width="70"/>
