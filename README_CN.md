@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="76" align="right" alt="PatMaxSharp">
+
 # PatMaxSharp — C# 实现的 Cognex PatMax (PMAlign) 对标工程
 
 在训练图上框一个区域，在任意搜索图中定位该目标，输出亚像素位置、角度、尺度；独立实现，不链接也不调用 `cogxpma.dll` / `Cognex.VisionPro.PMAlign.dll`。
@@ -311,6 +313,8 @@ PatMaxSharp/
 ```
 
 ## 12. 快速开始
+
+> 应用图标 `PatMaxSharp.UI/Assets/patmax.ico`（16–256 多尺寸），生成脚本见 `docs/make_icon.py`。
 
 ```csharp
 var tool = new PatMaxSharp.PatMaxTool

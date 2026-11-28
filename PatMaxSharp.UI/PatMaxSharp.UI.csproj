@@ -8,6 +8,7 @@
     <AssemblyName>PatMaxSharp.UI</AssemblyName>
     <RootNamespace>PatMaxSharp.UI</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\patmax.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

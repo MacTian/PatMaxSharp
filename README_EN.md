@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="76" align="right" alt="PatMaxSharp">
+
 # PatMaxSharp — a C# work-alike of Cognex PatMax (PMAlign)
 
 Train one region of a training image, then locate that target in any search image and return a sub-pixel position, angle and scale. An independent implementation: it does not link to or call `cogxpma.dll` / `Cognex.VisionPro.PMAlign.dll`.
