@@ -48,7 +48,6 @@ public partial class MainWindow : Window
         rbSearch.Checked += (_, _) => viewer.SelectMode = RegionKind.Search;
 
         viewer.RegionChanged += _ => _vm.RefreshRegions();
-        viewer.GeometryReported += text => _vm.SetStatus(text);
 
         _vm.PropertyChanged += (_, e) =>
         {

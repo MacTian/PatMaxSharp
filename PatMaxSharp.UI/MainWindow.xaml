@@ -91,7 +91,7 @@
             <ScrollViewer Grid.Column="0" Background="#252526" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <!-- Region selection -->
-                    <GroupBox Header="1. 区域选择（在图片上拖拽）">
+                    <Expander Header="1. 区域选择（在图片上拖拽）" IsExpanded="True">
                         <StackPanel>
                             <TextBlock Text="训练区域 (绿色)" Foreground="#7CFC00" Margin="2"/>
                             <TextBlock Text="{Binding TrainRegion}" Foreground="#CCC" FontSize="11"/>
@@ -102,10 +102,10 @@
                                 <RadioButton x:Name="rbSearch" Content="选择搜索区" Foreground="#CCC" Margin="2"/>
                             </StackPanel>
                         </StackPanel>
-                    </GroupBox>
+                    </Expander>
 
                     <!-- Search parameters -->
-                    <GroupBox Header="2. 训练参数">
+                    <Expander Header="2. 训练参数" IsExpanded="False">
                     <StackPanel Margin="4">
                         <TextBlock Text="训练算法: PatMax（PatQuick / PatFlex 未实现）" Style="{StaticResource lbl}"/>
                         <CheckBox Content="忽略极性 (IgnorePolarity)" IsChecked="{Binding IgnorePolarity}"
@@ -122,9 +122,9 @@
                         <TextBlock Text="{Binding TrainMinSpacing, StringFormat='特征最小间距: {0:F1} px'}" Style="{StaticResource lbl}"/>
                         <Slider Minimum="1" Maximum="8" Value="{Binding TrainMinSpacing}" TickFrequency="0.5"/>
                     </StackPanel>
-                </GroupBox>
+                </Expander>
 
-                <GroupBox Header="3. 查找参数">
+                <Expander Header="3. 查找参数" IsExpanded="False">
                         <StackPanel>
                             <TextBlock Text="搜索范围 (搜索区域大小)" Style="{StaticResource lbl}"/>
                             <TextBlock Text="搜索区域覆盖整幅图，可在图片上框选限定范围" Foreground="#888" FontSize="11" Margin="2,0,0,6"/>
@@ -148,10 +148,10 @@
                             <TextBlock Text="{Binding TimeoutMs, StringFormat='超时: {0:F0} ms'}" Style="{StaticResource lbl}"/>
                             <Slider Minimum="100" Maximum="30000" Value="{Binding TimeoutMs}" TickFrequency="500"/>
                         </StackPanel>
-                    </GroupBox>
+                    </Expander>
 
                     <!-- Scoring parameters -->
-                    <GroupBox Header="4. 评分参数">
+                    <Expander Header="4. 评分参数" IsExpanded="False">
                         <StackPanel>
                             <TextBlock Text="{Binding AcceptThreshold, StringFormat='接受阈值: {0:F2}'}" Style="{StaticResource lbl}"/>
                             <Slider Minimum="0" Maximum="1" Value="{Binding AcceptThreshold}" TickFrequency="0.01"/>
@@ -172,10 +172,10 @@
                             <TextBlock Text="{Binding MaxResults, StringFormat='最大结果数: {0}'}" Style="{StaticResource lbl}"/>
                             <Slider Minimum="1" Maximum="50" Value="{Binding MaxResults}" TickFrequency="1"/>
                         </StackPanel>
-                    </GroupBox>
+                    </Expander>
 
                     <!-- Preset management -->
-                    <GroupBox Header="6. 参数预设">
+                    <Expander Header="6. 参数预设" IsExpanded="False">
                         <StackPanel>
                             <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
                                       DisplayMemberPath="Name" Margin="2" ToolTip="{Binding SelectedPreset.Description}"/>
@@ -190,10 +190,10 @@
                             <TextBlock Text="预设保存在本地 AppData，重启后自动加载" Foreground="#666"
                                        FontSize="10" Margin="2,4,0,0"/>
                         </StackPanel>
-                    </GroupBox>
+                    </Expander>
 
                     <!-- Performance parameters -->
-                    <GroupBox Header="5. 性能 / 精度">
+                    <Expander Header="5. 性能 / 精度" IsExpanded="False">
                         <StackPanel>
                             <TextBlock Text="{Binding PrecisionStep, StringFormat='累加器步长: {0} px'}" Style="{StaticResource lbl}"/>
                             <Slider Minimum="1" Maximum="8" Value="{Binding PrecisionStep}" TickFrequency="1"/>
@@ -206,7 +206,7 @@
                             <CheckBox Content="SIMD 加速" IsChecked="{Binding UseSimd}"/>
                             <CheckBox Content="并行处理" IsChecked="{Binding UseParallel}"/>
                         </StackPanel>
-                    </GroupBox>
+                    </Expander>
                 </StackPanel>
             </ScrollViewer>
 
