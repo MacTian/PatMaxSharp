@@ -44,22 +44,7 @@ A full single search at 640×480 (pyramid build + ±180° full-angle search + su
 | Trained features | 143 typical (real calibration part bounding box); 600 cap | Sections 8, 9 |
 | Real-image hit rate | 12/12 images, 7–13 ms per frame | Section 8 |
 
-## 4. Review findings: why the previous revision was rewritten
-
-The previous revision compiled and produced output, but the algorithm did not actually work. Each of the eight problems below was reproduced and confirmed before the rewrite; each fix is the direct origin of the current design.
-
-| # | Problem in the previous revision | Consequence | What this revision does |
-|---|---|---|---|
-| 1 | Twelve orientations shared one `response` buffer inside `Parallel.For` | Data race; the same input produced different results on different runs | The "12-orientation parallel accumulation" structure is gone: features store a signed directional-derivative field, a response in any direction is one dot product, and there is no writable buffer shared across threads |
-| 2 | The Gabor kernel used a cosine phase (even symmetry) | Response peaked on bright lines rather than step edges, and carried no polarity | The main path is a separable DoG gradient field (odd symmetry, maximal on step edges) and features carry polarity explicitly; Gabor is kept as a fidelity reference path |
-| 3 | The template was a sliding window over the whole training image | The window had exactly one legal position, so the match result was **always the training origin**; translation, rotation and occlusion tests all returned the same coordinates | The template became a sparse feature set (position, unit normal, polarity, strength) correlated over a search-image pyramid, so a peak can land anywhere |
-| 4 | The pose fit used the same predicted points as both source and target | The fit was always the identity transform, so pose decimals were meaningless | Correspondences come from sub-pixel edge positions **measured** along each feature normal, separate from the predicted points, followed by a robust similarity least-squares fit |
-| 5 | Any `magnitude > 0` counted as a hit | Noise and texture scored too, causing heavy false positives (an empty scene once reported 5 targets) | Three gates: `score = coverage^(1/N)` against `AcceptThreshold`, a `ContrastThreshold` gate, and a coarse-stage `CoarseAcceptThreshold` prefilter, plus a clutter penalty |
-| 6 | `BuildChains` grew by nearest neighbour, O(n²) | Unusable beyond a few thousand edge points | Spatial hash + BFS flood fill (`ShapeAnchorTool.BuildChains`), near linear |
-| 7 | The UI's `ScaleMin/Max` were never passed to the algorithm | Scale search was decorative | `BuildOptions` maps every public parameter into `SearchOptions`, scale range included |
-| 8 | No tests and no benchmarks; the README's performance numbers were not reproducible | No way to tell whether a change helped or hurt | Added `Benchmarks` (synthetic ground-truth rendering, accuracy and performance suites, real-image check), a `--selftest` exit-code gate, and two-platform CI |
-
-## 5. Algorithm
+## 4. Algorithm
 
 ### 5.1 Training
 
@@ -97,7 +82,7 @@ Acceptance rule: `Accepted ⟺ Score ≥ AcceptThreshold`. A half-occluded part 
 
 Features store a **signed directional-derivative field** rather than an index into 12 quantised orientations. A response in any direction is therefore a single dot product: the angle is continuous, there are no quantisation steps, and sub-pixel pose fitting is meaningful. The old 12-bin quantisation introduced 15° (360°/24) angle steps and forced parallel accumulation into a shared buffer — the common root of problems 1 and 4.
 
-## 6. Measured accuracy
+## 5. Measured accuracy
 
 Setup: synthetic gear part, ground truth given exactly by the render pose; `dotnet run -c Release -- --selftest`; i9-12950HX / 24 threads; **the first row includes JIT warm-up**.
 
@@ -116,7 +101,7 @@ Setup: synthetic gear part, ground truth given exactly by the render pose; `dotn
 
 All 10 cases PASS. `--selftest` exits with code 1 on failure, so this section is an automatable acceptance condition rather than a claim in a document.
 
-## 7. Measured performance
+## 6. Measured performance
 
 Full single search, including pyramid build + ±180° full-angle search + sub-pixel fit, one target:
 
@@ -138,7 +123,7 @@ Edge front end (640×480):
 Throughput rises with image size because the fixed per-search overhead (pyramid build, candidate sweep, fit) dominates on small images; absolute time growing sub-linearly with area is expected, not a measurement error.
 The values are representative of one run on this machine (i9-12950HX, 24 threads, .NET 8 Release); repeated runs vary by roughly ±15%, and the absolute spread is largest at 1280×960.
 
-## 8. Real-image check
+## 7. Real-image check
 
 Data: 12 PNG images at 640×480 in the local `D:\FTP\calibration` folder — a 3×3 translation grid plus 3 rotated parts.
 
@@ -163,7 +148,7 @@ On the same 17 frames that setting gives **9 frames at score >= 0.90, 8 in 0.70-
 
 So the demo settings (contrast 0, clutter off) trade discrimination for recall; this library the other way round. Both are self-consistent; which one is right depends on whether the line cares more about false accepts or misses.
 
-## 9. Parameters
+## 8. Parameters
 
 ### 9.1 Quick reference (this implementation's defaults)
 
@@ -260,7 +245,7 @@ What the numbers say:
 - The multi-target instance ceiling depends on how much the parts occlude each other (4 on the
   challenge set; an unoccluded tray image yields more).
 
-## 10. Binary forensics and what they do not prove
+## 9. Binary forensics and what they do not prove
 
 `docs/evidence/api-surface.md`, `docs/evidence/params-reference.md` and `docs/evidence/native-strings.md` record **static forensics** on the locally installed Cognex binaries: metadata tables, constant tables and attribute blobs were read; VisionPro was never executed.
 
@@ -274,7 +259,7 @@ What the numbers say:
 
 One statement has to be made explicitly: the native core `cogxpma.dll` is WIBU-packed (17 of its 18 sections are `__wibu*`, entropy 7.99–8.00, no `.text` / `.rdata`). Any RVA, struct offset or instruction-level claim attributed to that native DLL is therefore **not statically verifiable**. The scoring formula in this project is an engineering reproduction of PatMax behaviour (for example scoring about 0.7 at half occlusion), not something read line by line out of machine code. Read everything outside the table above as behaviour alignment, not as reverse-engineering fact.
 
-## 11. Project layout
+## 10. Project layout
 
 ```
 ShapeAnchor/
@@ -294,7 +279,7 @@ ShapeAnchor/
 └── ShapeAnchor.UI/  WPF front end
 ```
 
-## 12. Quick start
+## 11. Quick start
 
 ```csharp
 var tool = new ShapeAnchor.ShapeAnchorTool
@@ -321,7 +306,7 @@ Command line:
 | `dotnet run -c Release -- --cal <directory>` | Real-image check over the PNGs in a folder |
 | `dotnet run --project ShapeAnchor.UI -c Release` | WPF front end |
 
-## 13. Coverage
+## 12. Coverage
 
 | Covered (and measured) | Not covered |
 |---|---|
@@ -335,7 +320,7 @@ Command line:
 | Sub-pixel pose (position, angle and scale fitted together) | |
 | Real images (12 × 640×480 calibration parts) | |
 
-## 14. Reproducing the numbers
+## 13. Reproducing the numbers
 
 Which command produces which table:
 
@@ -350,7 +335,7 @@ Which command produces which table:
 
 The Section 7 figures depend on CPU and thread count (i9-12950HX / 24 threads); the Section 6 accuracy figures are machine-independent — a different machine should land in the same order of magnitude.
 
-## 15. Licence
+## 14. Licence
 
 MIT, for study and research.
 

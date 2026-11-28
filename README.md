@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="96" alt="ShapeAnchor">
+
 # ShapeAnchor
 
 **C# 实现的 Cognex PatMax (PMAlign) 对标工程 —— 训练图上一个区域，在任意搜索图中定位该目标，输出亚像素位置、角度、尺度。**
@@ -63,30 +65,11 @@ Search  边缘金字塔 → 最粗层 (角度 × 尺度) 穷举，方向/极性�
 关键点：位姿拟合的对应点来自**实测亚像素边缘**，不是把预测点拟合到自身。
 The decisive point: pose correspondences come from **measured sub-pixel edges**, not from fitting predicted points to themselves.
 
-## 本版修复摘要 / What this revision fixed
-
-上一版能跑但“算法没工作”，八处问题逐条修掉：
-
-The previous revision ran but the algorithm did not work; eight problems were fixed:
-
-| # | 上一版 / Before | 本版 / Now |
-|---|---|---|
-| 1 | 12 朝向共用 `response` 缓冲（`Parallel.For` 数据竞争）/ 12 orientations shared one `response` buffer (data race) | 有符号方向导数场，任意方向一次点乘，无共享写缓冲 / signed directional-derivative field, one dot product per direction, no shared buffer |
-| 2 | Gabor 余弦相位（偶对称），响应对亮线、无极性 / Gabor cosine phase, responds to bright lines, no polarity | 可分离 DoG 梯度场（奇对称，对阶跃边），特征带极性 / separable DoG (odd symmetry, step edges), explicit polarity |
-| 3 | 模板 = 整图滑窗 → 结果恒等于训练原点 / template = whole-image sliding window → result always the training origin | 稀疏特征集在金字塔上相关，峰值可落任意处 / sparse feature set correlated over a pyramid, peak anywhere |
-| 4 | 拟合源点 = 目标点 → 恒为单位变换 / fit source = target → always identity | 对应点来自实测亚像素边缘 / correspondences from measured sub-pixel edges |
-| 5 | `magnitude > 0` 即命中 → 空场景报 5 个目标 / any `magnitude > 0` counted → 5 targets on an empty scene | 三重门 + clutter 惩罚 → 空场景 0 误报 / three gates + clutter penalty → 0 false accepts |
-| 6 | `BuildChains` O(n²) / O(n²) | 空间哈希 + BFS / spatial hash + BFS |
-| 7 | UI 的 `ScaleMin/Max` 未传给算法 / UI scale range never reached the algorithm | 全部参数经 `BuildOptions` 映射 / all parameters mapped through `BuildOptions` |
-| 8 | 无测试无基准 / no tests, no benchmarks | 基准套件 + `--selftest` 退出码 + 双平台 CI / benchmark suite + `--selftest` exit code + two-platform CI |
-
-详细复盘见 [中文版第 4 节](README_CN.md#4-review-结论上一版为何推倒重写) / [English Section 4](README_EN.md#4-review-findings-why-the-previous-revision-was-rewritten)。
-
 ## 与原版的关系 / Relationship to the original
 
 | | |
 |---|---|
-| **并排对齐 / Aligned** | `AcceptThreshold` 0.5、`CoarseAcceptThreshold` 0.33、`ScoreUsingClutter` true、`IgnorePolarity` false 与原版默认值一致 / match the original defaults |
+| **并排对齐 / Aligned** | `AcceptThreshold` 0.70、`CoarseAcceptThreshold` 0.33、`ScoreUsingClutter` true、`IgnorePolarity` false 与原版默认值一致 / match the original defaults |
 | **换算表达 / Re-expressed** | `ContrastThreshold` 10（0–65535）→ 归一化 0–1；`EdgeThreshold` 10/5 → `NoiseFloor` 8.0；`GrainLimitFine/Coarse` → `MaxLevels` + `Grain`；`XYOverlap` 0.8 → `ClusterRadius` 8 px；`ApproximateNumberToFind` → `Run(image, maxResults)` |
 | **硬证据 / Hard evidence** | 边缘前处理默认参数块（σx = 2.0506096654409878，σy = 4.1012193308819755 = 2σx，核半窗 7）存在于托管程序集的原生 `.text`（RVA `0x00EAF2C0`）；取证见 `docs/evidence/` / present in the managed assembly's native `.text` at RVA `0x00EAF2C0`; see `docs/evidence/` |
 | **边界 / Boundary** | `cogxpma.dll` 是 WIBU 加壳（18 节中 17 个 `__wibu*`，熵 7.99–8.00），原生侧的 RVA/结构体偏移静态不可复核；评分公式是行为工程复现，非反汇编结论 / `cogxpma.dll` is WIBU-packed, so native-side RVAs and struct offsets are not statically verifiable; the scoring formula is an engineering reproduction of behaviour, not a disassembly result |
