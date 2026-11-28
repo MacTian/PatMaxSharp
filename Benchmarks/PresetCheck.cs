@@ -16,6 +16,7 @@ public static class PresetCheck
     public static double? TrainFloorOverride;
     public static int? MaxFeaturesOverride;
     public static double? CoherenceOverride;
+    public static double? ScaleMinOverride, ScaleMaxOverride;
 
     private static ShapeAnchorTool MakeTool(SearchPreset preset, bool acceptAll)
     {
@@ -26,8 +27,8 @@ public static class PresetCheck
             UseClutter = preset.ScoreUsingClutter,
             RotationAngleMin = preset.RotationAngleMin,
             RotationAngleMax = preset.RotationAngleMax,
-            ScaleMin = preset.ScaleMin,
-            ScaleMax = preset.ScaleMax,
+            ScaleMin = ScaleMinOverride ?? preset.ScaleMin,
+            ScaleMax = ScaleMaxOverride ?? preset.ScaleMax,
             PrecisionStep = preset.PrecisionStep,
             SubpixelRefinement = preset.SubpixelRefinement,
             EnableClustering = preset.EnableClustering,

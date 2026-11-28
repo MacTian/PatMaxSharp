@@ -46,6 +46,12 @@ if (presetIndex >= 0 && presetIndex + 1 < args.Length)
     if (mf > 0 && mf + 1 < args.Length) PresetCheck.MaxFeaturesOverride = int.Parse(args[mf + 1]);
     int co = Array.FindIndex(args, a => a.Equals("--coherence", StringComparison.OrdinalIgnoreCase));
     if (co > 0 && co + 1 < args.Length) PresetCheck.CoherenceOverride = double.Parse(args[co + 1]);
+    int sc = Array.FindIndex(args, a => a.Equals("--scale", StringComparison.OrdinalIgnoreCase));
+    if (sc > 0 && sc + 2 < args.Length)
+    {
+        PresetCheck.ScaleMinOverride = double.Parse(args[sc + 1]);
+        PresetCheck.ScaleMaxOverride = double.Parse(args[sc + 2]);
+    }
     PresetCheck.Run(args[presetIndex + 1],
         args.Any(a => a.Equals("--detail", StringComparison.OrdinalIgnoreCase)));
     return 0;
