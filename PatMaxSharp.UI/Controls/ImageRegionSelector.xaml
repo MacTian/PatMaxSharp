@@ -14,7 +14,7 @@
                 MouseLeftButtonUp="OnMouseUp"
                 MouseWheel="OnMouseWheel">
             <Canvas.Background>
-                <ImageBrush x:Name="brush" Stretch="Fill"/>
+                <ImageBrush Stretch="Fill"/>
             </Canvas.Background>
         </Canvas>
     </ScrollViewer>

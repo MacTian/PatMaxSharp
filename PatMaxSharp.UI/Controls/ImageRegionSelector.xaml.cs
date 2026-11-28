@@ -172,7 +172,7 @@ public partial class ImageRegionSelector : UserControl
     {
         if (_canvas != null) return;
         _canvas = canvas;
-        _brush = brush;
+        _brush = (ImageBrush)_canvas.Background;
 
         _trainRect = MakeRect(Brushes.Lime, Color.FromArgb(40, 0, 255, 0));
         _searchRect = MakeRect(Brushes.Cyan, Color.FromArgb(40, 0, 255, 255));
