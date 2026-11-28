@@ -303,6 +303,8 @@ ShapeAnchor/
 
 ## 11. 快速开始
 
+> **Visual Studio 用户请打开 `ShapeAnchor.sln`**，不要单独双击 `.csproj`：解决方案包含核心库、控件库、WPF 前端三个工程，单独打开某个工程时跨工程的引用（例如 XAML 里的 `ImageRegionSelector`）无法被设计器解析。
+
 > 应用图标 `ShapeAnchor.UI/Assets/shapeanchor.ico`（16–256 多尺寸），生成脚本见 `docs/make_icon.py`。
 
 ```csharp
@@ -328,6 +330,7 @@ foreach (var r in tool.Run(searchImage, 5))
 | `dotnet run -c Release -- --selftest` | 精度门禁，全过退出码 0，任一失败退出码 1 |
 | `dotnet run -c Release -- --bench` | 只跑性能 |
 | `dotnet run -c Release -- --cal <目录> [--ncc] [--no-autofloor] [--ignore-polarity]` | 对目录内 PNG/BMP 做真图验证 |
+| `dotnet build ShapeAnchor.sln -c Release` | 整体构建（核心 + 控件库 + WPF 前端） |
 | `dotnet run --project ShapeAnchor.UI -c Release` | WPF 前端 |
 
 ## 12. 覆盖范围

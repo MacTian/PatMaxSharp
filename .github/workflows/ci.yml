@@ -25,7 +25,7 @@ jobs:
       # The WPF front end only builds on Windows, so the gate builds the core library
       # explicitly and runs the headless accuracy suite on both platforms.
       - name: Build core
-        run: dotnet build ShapeAnchor.csproj -c Release
+        run: dotnet build ShapeAnchor.csproj -c Release  # core only: the WPF projects are Windows-only
 
       - name: Accuracy self-test
         run: dotnet run --project ShapeAnchor.csproj -c Release --no-build -- --selftest

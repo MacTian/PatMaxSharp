@@ -281,6 +281,10 @@ ShapeAnchor/
 
 ## 11. Quick start
 
+> **In Visual Studio, open `ShapeAnchor.sln`, not an individual `.csproj`.** The solution holds the
+> core library, the control library and the WPF app; opening one project on its own leaves the
+> designer unable to resolve cross-project types such as the `ImageRegionSelector` used in XAML.
+
 ```csharp
 var tool = new ShapeAnchor.ShapeAnchorTool
 {
@@ -304,6 +308,7 @@ Command line:
 | `dotnet run -c Release -- --selftest` | Accuracy gate; exit code 0 when all pass, 1 when any fails |
 | `dotnet run -c Release -- --bench` | Performance only |
 | `dotnet run -c Release -- --cal <directory>` | Real-image check over the PNGs in a folder |
+| `dotnet build ShapeAnchor.sln -c Release` | build everything (core + control library + WPF app) |
 | `dotnet run --project ShapeAnchor.UI -c Release` | WPF front end |
 
 ## 12. Coverage
