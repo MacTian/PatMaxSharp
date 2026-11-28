@@ -24,6 +24,14 @@ public sealed class SearchOptions
     public double AcceptThreshold { get; set; } = 0.7;
 
     /// <summary>
+    /// Minimum share of the matched feature weight whose edge direction agrees with the model
+    /// normal, measured with the majority sign so an inverted-contrast instance still scores ~1.
+    /// 0 disables the gate. A polarity-agnostic run needs it: a real instance is coherent (~1.0)
+    /// while a pose that merely shares edge density lands near 0.5.
+    /// </summary>
+    public double MinPolarityCoherence { get; set; }
+
+    /// <summary>
     /// Coarse-stage gate (CoarseAcceptThreshold). A hypothesis must reach this score at the
     /// coarsest level before the refinement levels spend time on it — a lower threshold than
     /// <see cref="AcceptThreshold"/>, so a marginal part still gets refined instead of dropped.

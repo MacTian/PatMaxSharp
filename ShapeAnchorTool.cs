@@ -140,6 +140,9 @@ public sealed class ShapeAnchorTool
     /// <summary>Ignore edge polarity when training (CogPMAlignPattern.IgnorePolarity).</summary>
     public bool IgnorePolarity { get; set; }
 
+    /// <summary>Polarity coherence gate; raised to 0.7 automatically for polarity-agnostic models.</summary>
+    public double MinPolarityCoherence { get; set; } = -1;   // -1 = auto
+
     /// <summary>Automatic edge threshold (adapts the floor to the image contrast).</summary>
     public bool AutoEdgeThreshold
     {
@@ -306,6 +309,11 @@ public sealed class ShapeAnchorTool
         SubpixelRefinement = SubpixelRefinement,
         OverlapSuppression = 0.55,
         MinSeparationPixels = Separations(),
+        // Ignoring polarity must not mean "anything with edges is fine": an instance whose
+        // contrast is inverted is still coherent (~1.0), a wrong pose is not (~0.5).
+        MinPolarityCoherence = Pattern != null && Pattern.PolarityAgnostic && MinPolarityCoherence < 0
+            ? 0.7
+            : Math.Max(0.0, MinPolarityCoherence),
         UseClutter = UseClutter,
         NormalizedCorrelation = NormalizedCorrelation,
         MaxLevels = MaxLevels,

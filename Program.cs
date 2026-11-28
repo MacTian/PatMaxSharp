@@ -16,6 +16,20 @@ bool quiet = Has("--quiet");
 bool Has(string flag) => args.Any(a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
 
 // ---------------------------------------------------------------------------
+//  --explain <image> [--preset <name>] : every refined hypothesis, ungated
+// ---------------------------------------------------------------------------
+int explainIndex = Array.FindIndex(args, a => a.Equals("--explain", StringComparison.OrdinalIgnoreCase));
+if (explainIndex >= 0 && explainIndex + 1 < args.Length)
+{
+    int pe = Array.FindIndex(args, a => a.Equals("--preset", StringComparison.OrdinalIgnoreCase));
+    string presetName = pe > 0 && pe + 1 < args.Length ? args[pe + 1] : "";
+    int be = Array.FindIndex(args, a => a.Equals("--base", StringComparison.OrdinalIgnoreCase));
+    string basePath = be > 0 && be + 1 < args.Length ? args[be + 1] : null;
+    PresetCheck.Explain(args[explainIndex + 1], presetName, basePath);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 //  --presets <dir> : run every built-in preset over a folder
 // ---------------------------------------------------------------------------
 int presetIndex = Array.FindIndex(args, a => a.Equals("--presets", StringComparison.OrdinalIgnoreCase));

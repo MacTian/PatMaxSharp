@@ -24,6 +24,13 @@ public sealed class MatchResult
     /// <summary>RMS residual of the pose fit in pixels; NaN when sub-pixel refinement is switched off.</summary>
     public double FitError { get; set; }
 
+    /// <summary>
+    /// Share of the matched feature weight whose edge points the same way as the model normal,
+    /// taking the majority sign (so an inverted-contrast instance still scores ~1). A pattern
+    /// that only shares edge density with the model lands near 0.5.
+    /// </summary>
+    public double PolarityCoherence { get; set; }
+
     /// <summary>Weighted feature coverage in [0,1] (matched feature weight / total feature weight).</summary>
     public double Coverage { get; set; }
 

@@ -15,6 +15,9 @@ public sealed class SearchPreset
     public double ContrastThreshold { get; set; } = 0.08;
     public bool ScoreUsingClutter { get; set; } = true;
 
+    /// <summary>Polarity coherence gate; 0 lets the tool decide (0.7 for polarity-agnostic models).</summary>
+    public double MinPolarityCoherence { get; set; } = -1;   // -1 = 自动（极性无关模型用 0.7）
+
     // search window
     public double RotationAngleMin { get; set; } = -180;
     public double RotationAngleMax { get; set; } = 180;

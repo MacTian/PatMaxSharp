@@ -105,7 +105,7 @@ public sealed class SearchEngine
         foreach (var h in hypotheses)
         {
             var om = BuildOrientedModel(model, int.MaxValue, h.Angle, h.Scale, pyramid.Scales[0]);
-            ScoreAtBilinear(level0, om, h.X, h.Y, invRef0, minResp0, out int m, out double mw, out _);
+            ScoreAtBilinear(level0, om, h.X, h.Y, invRef0, minResp0, out int m, out double mw, out _, out _);
             double cov = mw / Math.Max(1e-6, om.TotalWeight);
             double s = Math.Pow(Math.Clamp(cov, 0, 1), exponent0);
             if (s >= preGate) pre.Add((h, s));
@@ -342,11 +342,13 @@ public sealed class SearchEngine
 
     /// <summary>Clamped bilinear coverage score - the final scoring criterion.</summary>
     private static double ScoreAtBilinear(EdgeMap map, OrientedModel om, double cx, double cy, float invRef,
-        double minResponse, out int matchedCount, out double matchedWeight, out double contrastSum)
+        double minResponse, out int matchedCount, out double matchedWeight, out double contrastSum,
+        out double polarityCoherence)
     {
         var gx = map.Gx; var gy = map.Gy;
         int w = map.Width, h = map.Height;
         double acc = 0, wsum = 0, contrast = 0;
+        double posWeight = 0, negWeight = 0;
         int matched = 0;
         int n = om.Count;
 
@@ -362,12 +364,16 @@ public sealed class SearchEngine
             double gxb = (gx[i0] * (1 - fx) + gx[i0 + 1] * fx) * (1 - fy) + (gx[i1] * (1 - fx) + gx[i1 + 1] * fx) * fy;
             double gyb = (gy[i0] * (1 - fx) + gy[i0 + 1] * fx) * (1 - fy) + (gy[i1] * (1 - fx) + gy[i1 + 1] * fx) * fy;
 
-            double d = gxb * om.Nx[f] + gyb * om.Ny[f];
-            if (om.Agnostic) d = Math.Abs(d);
+            double signed = gxb * om.Nx[f] + gyb * om.Ny[f];
+            double d = om.Agnostic ? Math.Abs(signed) : signed;
             if (d >= minResponse)
             {
                 matched++;
                 wsum += om.W[f];
+                // Whether the image edge points the same way as the model normal. A real instance
+                // is coherent (all positive, or all negative when the contrast is inverted); a
+                // pattern that merely shares edge density lands on both signs about equally.
+                if (signed >= 0) posWeight += om.W[f]; else negWeight += om.W[f];
                 contrast += d;
                 double rel = d * invRef;
                 acc += om.W[f] * (rel < 1.0 ? rel : 1.0);
@@ -377,6 +383,7 @@ public sealed class SearchEngine
         matchedCount = matched;
         matchedWeight = wsum;
         contrastSum = contrast;
+        polarityCoherence = wsum > 0 ? Math.Max(posWeight, negWeight) / wsum : 0;
         return acc / om.TotalWeight;
     }
 
@@ -385,11 +392,13 @@ public sealed class SearchEngine
     /// once every feature already matches, which an angular refinement needs - the clamped
     /// version saturates and produces ties at the window edge.
     /// </summary>
-    private static double ScoreSumBilinear(EdgeMap map, OrientedModel om, double cx, double cy, float invRef, double minResponse)
+    private static double ScoreSumBilinear(EdgeMap map, OrientedModel om, double cx, double cy, float invRef,
+        double minResponse, out double signedAgreement)
     {
         var gx = map.Gx; var gy = map.Gy;
         int w = map.Width, h = map.Height;
         double acc = 0, energy = 0;
+        double signedAcc = 0, absAcc = 0;
         int inBounds = 0;
         int n = om.Count;
 
@@ -405,8 +414,17 @@ public sealed class SearchEngine
             double gxb = (gx[i0] * (1 - fx) + gx[i0 + 1] * fx) * (1 - fy) + (gx[i1] * (1 - fx) + gx[i1 + 1] * fx) * fy;
             double gyb = (gy[i0] * (1 - fx) + gy[i0 + 1] * fx) * (1 - fy) + (gy[i1] * (1 - fx) + gy[i1 + 1] * fx) * fy;
 
-            double d = gxb * om.Nx[f] + gyb * om.Ny[f];
-            if (om.Agnostic) d = Math.Abs(d);
+            double signed = gxb * om.Nx[f] + gyb * om.Ny[f];
+            // Ranking signal for polarity-agnostic models: the signed accumulator agrees only
+            // when the image edge points the way the model normal does. A pose that merely shares
+            // edge density cancels itself out here, which is what keeps a shrunken copy of the
+            // pattern from outranking the real instance.
+            double sPos = signed - minResponse;
+            if (sPos > 0) signedAcc += om.W[f] * sPos;
+            double sAbs = Math.Abs(signed) - minResponse;
+            if (sAbs > 0) absAcc += om.W[f] * sAbs;
+
+            double d = om.Agnostic ? Math.Abs(signed) : signed;
             d -= minResponse;
             if (d > 0) acc += om.W[f] * d;
 
@@ -419,6 +437,7 @@ public sealed class SearchEngine
         // leftover energy of the wrong footprint is divided away. Normalisation belongs to the
         // coarse candidate stage, which only has to decide *where* to look.
         _ = energy; _ = inBounds;
+        signedAgreement = absAcc > 1e-9 ? signedAcc / absAcc : 0.0;
         return acc * invRef / om.TotalWeight;
     }
 
@@ -463,22 +482,22 @@ public sealed class SearchEngine
         for (int y = ya; y <= yb; y++)
             for (int x = xa; x <= xb; x++)
             {
-                double s = ScoreSumBilinear(map, om, x, y, invRef, minResp);
+                double s = ScoreSumBilinear(map, om, x, y, invRef, minResp, out _);
                 if (s > best) { best = s; bestIx = x; bestIy = y; }
             }
 
         double dx = 0, dy = 0;
         if (bestIx > xa && bestIx < xb)
         {
-            double v0 = ScoreSumBilinear(map, om, bestIx - 1, bestIy, invRef, minResp);
-            double v2 = ScoreSumBilinear(map, om, bestIx + 1, bestIy, invRef, minResp);
+            double v0 = ScoreSumBilinear(map, om, bestIx - 1, bestIy, invRef, minResp, out _);
+            double v2 = ScoreSumBilinear(map, om, bestIx + 1, bestIy, invRef, minResp, out _);
             double denom = v0 - 2 * best + v2;
             if (Math.Abs(denom) > 1e-12) dx = Math.Clamp(0.5 * (v0 - v2) / denom, -0.5, 0.5);
         }
         if (bestIy > ya && bestIy < yb)
         {
-            double v0 = ScoreSumBilinear(map, om, bestIx, bestIy - 1, invRef, minResp);
-            double v2 = ScoreSumBilinear(map, om, bestIx, bestIy + 1, invRef, minResp);
+            double v0 = ScoreSumBilinear(map, om, bestIx, bestIy - 1, invRef, minResp, out _);
+            double v2 = ScoreSumBilinear(map, om, bestIx, bestIy + 1, invRef, minResp, out _);
             double denom = v0 - 2 * best + v2;
             if (Math.Abs(denom) > 1e-12) dy = Math.Clamp(0.5 * (v0 - v2) / denom, -0.5, 0.5);
         }
@@ -585,10 +604,18 @@ public sealed class SearchEngine
         foreach (var cand in raw)
         {
             var om = BuildOrientedModel(model, opt.CoarseFeatureCount, cand.Angle, cand.Scale, pixelScale);
-            double coverage = ScoreAtBilinear(map, om, cand.X, cand.Y, invRef, coarseFloor, out _, out _, out _);
+            double coverage = ScoreAtBilinear(map, om, cand.X, cand.Y, invRef, coarseFloor,
+                                              out _, out _, out _, out double coherence);
             if (coverage < coarseMin) continue;
             var scoredHyp = cand;
-            scoredHyp.Score = coverage;
+            // Polarity-agnostic ranking. Coverage alone cannot tell a real instance from a pose
+            // that only shares edge density, and both score ~1.0, so the wrong one used to win the
+            // candidate slot and the correct pose never reached refinement. Coherence separates
+            // them cleanly (real ~1.0, wrong ~0.5); 2c-1 maps that onto 0..1, so a 0.5 pose keeps
+            // nothing of its coverage score while a real instance keeps all of it.
+            scoredHyp.Score = model.PolarityAgnostic
+                ? coverage * Math.Clamp(2.0 * coherence - 1.0, 0.0, 1.0)
+                : coverage;
             list.Add(scoredHyp);
         }
         if (list.Count == 0) list.AddRange(raw.Take(Math.Min(4, raw.Count)));
@@ -676,7 +703,7 @@ public sealed class SearchEngine
             {
                 double ang = h.Angle + (a - angleSamples) * angleStep;
                 var omA = a == angleSamples ? om : BuildOrientedModel(model, featureCount, ang, h.Scale, pixelScale);
-                double s = ScoreSumBilinear(map, omA, bx, by, invRef, minResp);
+                double s = ScoreSumBilinear(map, omA, bx, by, invRef, minResp, out _);
                 profile[a] = s;
                 if (s > bestScore) { bestScore = s; bestAng = ang; }
             }
@@ -776,7 +803,8 @@ public sealed class SearchEngine
 
         var omFinal = BuildOrientedModel(model, int.MaxValue, angle, scale, pixelScale);
         double minResp = Math.Max(0.5, stats.MagnitudeReference * opt.ContrastThreshold);
-        ScoreAtBilinear(map, omFinal, x, y, invRef, minResp, out int matched, out double matchedWeight, out double contrastSum);
+        ScoreAtBilinear(map, omFinal, x, y, invRef, minResp, out int matched, out double matchedWeight,
+            out double contrastSum, out double polarityCoherence);
 
         double coverage = matchedWeight / Math.Max(1e-6, omFinal.TotalWeight);
         int bad = omFinal.Count - matched;
@@ -805,8 +833,10 @@ public sealed class SearchEngine
             BadFeatures = bad,
             Accepted = score >= opt.AcceptThreshold
                     && contrast >= opt.ContrastThreshold
+                    && (opt.MinPolarityCoherence <= 0 || polarityCoherence >= opt.MinPolarityCoherence)
                     && InAngleWindow(NormalizeAngle(angle) * 180.0 / Math.PI, opt.AngleMin, opt.AngleMax),
             FitError = fitError,
+            PolarityCoherence = polarityCoherence,
             Clutter = clutterFraction
         };
     }
@@ -949,6 +979,7 @@ public sealed class SearchEngine
         {
             if (!r.Accepted) continue;
             if (!InAngleWindow(r.Angle * 180.0 / Math.PI, opt.AngleMin, opt.AngleMax)) continue;
+            if (opt.MinPolarityCoherence > 0 && r.PolarityCoherence < opt.MinPolarityCoherence) continue;
             bool overlaps = false;
             foreach (var k in kept)
             {
