@@ -25,6 +25,9 @@ bool Has(string flag) => args.Any(a => a.Equals(flag, StringComparison.OrdinalIg
         PresetCheck.SearchMaskPath = args[i + 1];
     if ((i = Array.FindIndex(args, a => a.Equals("--train-mask", StringComparison.OrdinalIgnoreCase))) > 0 && i + 1 < args.Length)
         PresetCheck.TrainMaskPath = args[i + 1];
+    if ((i = Array.FindIndex(args, a => a.Equals("--roi", StringComparison.OrdinalIgnoreCase))) > 0 && i + 4 < args.Length)
+        PresetCheck.RoiOverride = new RectI(int.Parse(args[i + 1]), int.Parse(args[i + 2]),
+                                            int.Parse(args[i + 3]), int.Parse(args[i + 4]));
     if ((i = Array.FindIndex(args, a => a.Equals("--scale", StringComparison.OrdinalIgnoreCase))) > 0 && i + 2 < args.Length)
     { PresetCheck.ScaleMinOverride = double.Parse(args[i + 1]); PresetCheck.ScaleMaxOverride = double.Parse(args[i + 2]); }
     if ((i = Array.FindIndex(args, a => a.Equals("--coherence", StringComparison.OrdinalIgnoreCase))) > 0 && i + 1 < args.Length)

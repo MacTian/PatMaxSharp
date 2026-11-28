@@ -320,7 +320,7 @@ ShapeAnchor/
 > **Visual Studio 用户请打开 `ShapeAnchor.sln`**，不要单独双击 `.csproj`：解决方案包含核心库、控件库、WPF 前端三个工程，单独打开某个工程时跨工程的引用（例如 XAML 里的 `ImageRegionSelector`）无法被设计器解析。
 
 > 应用图标 `ShapeAnchor.UI/Assets/shapeanchor.ico`（16–256 多尺寸），生成脚本见 `docs/make_icon.py`。
-> 原版 PatMax 的掩膜（Care / Don't Care，训练与运行两阶段）尚未实现，调研与实现方案见 `docs/mask-research.md`。
+> 原版 PatMax 的掩膜（Care / Don't Care）已实现：训练掩膜决定模型特征，运行掩膜 + 计分方式决定本次输入哪些区域不算数；UI 的「涂抹掩膜」可直接使用。详见 `docs/mask-research.md`。
 
 ```csharp
 var tool = new ShapeAnchor.ShapeAnchorTool

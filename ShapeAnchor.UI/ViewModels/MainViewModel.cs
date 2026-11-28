@@ -227,7 +227,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool _IgnorePolarity;
     public bool IgnorePolarity { get => _IgnorePolarity; set => Set(ref _IgnorePolarity, value); }
 
-    private int _TrainMaxFeatures = 600;
+    private int _TrainMaxFeatures = 120;
     public int TrainMaxFeatures { get => _TrainMaxFeatures; set => Set(ref _TrainMaxFeatures, value); }
 
     private double _TrainMinSpacing = 2.0;

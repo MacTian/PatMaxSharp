@@ -19,6 +19,7 @@ public static class PresetCheck
     public static double? ScaleMinOverride, ScaleMaxOverride;
     public static string SearchMaskPath;
     public static string TrainMaskPath;
+    public static RectI? RoiOverride;
 
     private static (byte[] mask, int w, int h)? LoadMask(string path)
     {
@@ -175,7 +176,7 @@ public static class PresetCheck
         }
 
         var trainImage = ImageLoader.Load(basePath);
-        var roi = PatternTrainer.ContentBounds(trainImage);
+        var roi = RoiOverride ?? PatternTrainer.ContentBounds(trainImage);
         var tool = MakeTool(preset, acceptAll: true);
         var pattern = tool.Train(trainImage, roi, roi.X + (roi.Width - 1) / 2.0,
                                  roi.Y + (roi.Height - 1) / 2.0, preset.Grain);
