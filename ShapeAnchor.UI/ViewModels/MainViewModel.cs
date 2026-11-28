@@ -520,6 +520,26 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ResetMask();
         Status = "掩膜已清空（全部 Care）";
     }
+    // ---- previously engine-only knobs, now exposed (高级) ----
+    private int _MaxCandidates = 20;
+    /// <summary>Hypotheses carried from the coarse stage into refinement.</summary>
+    public int MaxCandidates { get => _MaxCandidates; set => Set(ref _MaxCandidates, value); }
+
+    private double _CoarseAcceptThreshold = 0.33;
+    /// <summary>Coarse-stage gate; lower costs time, higher risks missing marginal parts.</summary>
+    public double CoarseAcceptThreshold
+    {
+        get => _CoarseAcceptThreshold;
+        set => Set(ref _CoarseAcceptThreshold, value);
+    }
+
+    private double _ScoreExponentN = 2.0;
+    /// <summary>score = coverage^(1/N). Smaller N is stricter about partial matches.</summary>
+    public double ScoreExponentN { get => _ScoreExponentN; set => Set(ref _ScoreExponentN, value); }
+
+    private double _TrainFeatureFloor = 0.08;
+    /// <summary>Training edge floor as a fraction of the strongest edge in the region.</summary>
+    public double TrainFeatureFloor { get => _TrainFeatureFloor; set => Set(ref _TrainFeatureFloor, value); }
     private double _MinPolarityCoherence = 0.75;
     /// <summary>
     /// Polarity coherence gate (0..1): share of matched features whose edge points the way the
@@ -568,10 +588,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set => Set(ref _XYOverlap, value);
     }
     private double _TimeoutMs = 5000;
+
+    /// <summary>"不限" reads better than "0 ms" for the unlimited case.</summary>
+    public string TimeoutText => TimeoutMs <= 0 ? "超时：不限" : $"超时：{TimeoutMs:F0} ms";
     public double TimeoutMs
     {
         get => _TimeoutMs;
-        set => Set(ref _TimeoutMs, value);
+        set { if (Set(ref _TimeoutMs, value)) OnPropertyChanged(nameof(TimeoutText)); }
     }
     private int _ApproximateNumberToFind = 1;
     public int ApproximateNumberToFind
@@ -966,7 +989,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _tool.RotationAngleMax = RotationAngleMax;
         _tool.ScaleMin = ScaleMin;
         _tool.ScaleMax = ScaleMax;
-        _tool.MaxCandidates = Math.Clamp(Math.Max(8, MaxResults * 2), 8, 32);
+        _tool.MaxCandidates = Math.Clamp(MaxCandidates, 4, 64);
+        _tool.CoarseAcceptThreshold = CoarseAcceptThreshold;
+        _tool.ScoreExponentN = ScoreExponentN;
         _tool.UseClutter = ScoreUsingClutter;
         _tool.TimeoutMs = TimeoutMs;
         _tool.XYOverlap = XYOverlap;
@@ -985,6 +1010,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _tool.IgnorePolarity = IgnorePolarity;
         _tool.TrainMaxFeatures = Math.Max(20, TrainMaxFeatures);
         _tool.TrainMinSpacing = Math.Max(1.0, TrainMinSpacing);
+        _tool.TrainFeatureFloor = Math.Clamp(TrainFeatureFloor, 0.0, 0.9);
         _tool.TrainMask = CropMaskForTrain();
         return _tool.Train(image, roi, originX, originY, Grain);
     }
@@ -1013,7 +1039,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _tool.RotationAngleMax = RotationAngleMax;
             _tool.ScaleMin = ScaleMin;
             _tool.ScaleMax = ScaleMax;
-            _tool.MaxCandidates = Math.Clamp(Math.Max(8, MaxResults * 2), 8, 32);
+            _tool.MaxCandidates = Math.Clamp(MaxCandidates, 4, 64);
+        _tool.CoarseAcceptThreshold = CoarseAcceptThreshold;
+        _tool.ScoreExponentN = ScoreExponentN;
             _tool.UseClutter = ScoreUsingClutter;
 
             var sw = System.Diagnostics.Stopwatch.StartNew();

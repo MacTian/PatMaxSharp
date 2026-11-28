@@ -397,165 +397,176 @@
             </Grid.ColumnDefinitions>
 
             <!-- ===== Parameter panel ===== -->
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto"
-                          Background="{StaticResource BPanel}">
-                <StackPanel Margin="4,6,6,10">
+                            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto"
+                              Background="{StaticResource BPanel}">
+                    <StackPanel Margin="4,6,6,10">
 
-                    <Expander Header="1. 区域选择" IsExpanded="True">
-                        <StackPanel>
-                            <TextBlock Text="训练区域（绿）" Foreground="#7BD88F" FontWeight="SemiBold" Margin="2,0,0,0"/>
-                            <TextBlock Text="{Binding TrainRegionText}" Style="{StaticResource value}"/>
-                            <TextBlock Text="搜索区域（青）" Foreground="#4FD3D3" FontWeight="SemiBold" Margin="2,6,0,0"/>
-                            <TextBlock Text="{Binding SearchRegionText}" Style="{StaticResource value}"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                <RadioButton x:Name="rbTrain" Content="选择训练区" IsChecked="True"/>
-                                <RadioButton x:Name="rbSearch" Content="选择搜索区"/>
-                                <RadioButton x:Name="rbMask" Content="涂抹掩膜"/>
-                            </StackPanel>
-                            <TextBlock Style="{StaticResource hint}" Margin="2,6,2,0"
-                                       Text="掩膜 = 原版的 Care / Don't Care：红色区域不参与训练与评分（忽略背景文字、杂波、反光）。"/>
-                            <TextBlock Style="{StaticResource hint}" Margin="2,6,2,0"
-                                       Text="在图片上按住左键拖出矩形；滚轮缩放。"/>
-                            <Border Background="#1F1F23" BorderBrush="{StaticResource BBorder}" BorderThickness="1"
-                                    CornerRadius="3" Padding="6" Margin="2,8,2,0">
-                                <StackPanel>
-                                    <CheckBox Content="启用掩膜（训练 + 运行）" IsChecked="{Binding UseMask}"/>
-                                    <TextBlock Text="{Binding MaskSummary}" Style="{StaticResource hint}"/>
-                                    <TextBlock Text="{Binding BrushRadius, StringFormat='笔刷半径：{0:F0} px'}"
-                                               Style="{StaticResource lbl}"/>
-                                    <Slider Minimum="2" Maximum="60" Value="{Binding BrushRadius}" TickFrequency="2"/>
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="擦除（标为 Don''t care）" IsChecked="{Binding MaskErase}"
-                                                  ToolTip="勾选=涂抹的区域被忽略；取消=涂抹的区域恢复参与"/>
-                                        <Button Content="清空掩膜" Command="{Binding ClearMaskCommand}" Margin="8,0,0,0"/>
-                                    </StackPanel>
-                                    <TextBlock Text="运行时被掩特征的计分方式" Style="{StaticResource lbl}"/>
-                                    <ComboBox SelectedIndex="{Binding MaskScoringIndex}">
-                                        <ComboBoxItem Content="不计分 DoNotScoreFeatures"/>
-                                        <ComboBoxItem Content="记为杂波 ScoreFeaturesAsClutter"/>
-                                    </ComboBox>
+                        <Expander Header="1. 区域与掩膜" IsExpanded="True">
+                            <StackPanel>
+                                <TextBlock Text="训练区域（绿）" Foreground="#7BD88F" FontWeight="SemiBold" Margin="2,0,0,0"/>
+                                <TextBlock Text="{Binding TrainRegionText}" Style="{StaticResource value}"/>
+                                <TextBlock Text="搜索区域（青）" Foreground="#4FD3D3" FontWeight="SemiBold" Margin="2,6,0,0"/>
+                                <TextBlock Text="{Binding SearchRegionText}" Style="{StaticResource value}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <RadioButton x:Name="rbTrain" Content="训练区" IsChecked="True"/>
+                                    <RadioButton x:Name="rbSearch" Content="搜索区"/>
+                                    <RadioButton x:Name="rbMask" Content="涂抹掩膜"/>
                                 </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </Expander>
+                                <TextBlock Style="{StaticResource hint}" Margin="2,6,2,0"
+                                           Text="拖动框选；滚轮缩放。掩膜 = 原版 Care / Don't Care：红色区域不参与训练与评分。"/>
 
-                    <Expander Header="2. 训练原点">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource hint}"
-                                       Text="匹配结果中的 (X, Y) 就是这个点在图像里的位置。缺省取训练区中心。"/>
-                            <Grid Margin="0,4,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="70"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="原点 X" Style="{StaticResource lbl}"/>
-                                <TextBox Grid.Column="1" Margin="2"
-                                         Text="{Binding OriginX, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"/>
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="70"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="原点 Y" Style="{StaticResource lbl}"/>
-                                <TextBox Grid.Column="1" Margin="2"
-                                         Text="{Binding OriginY, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"/>
-                            </Grid>
-                            <CheckBox Content="跟随训练区中心" IsChecked="{Binding OriginFollowsCenter}" Margin="2,6,2,2"/>
-                            <Button Content="中心原点" Command="{Binding CenterOriginCommand}" HorizontalAlignment="Left"/>
-                            <TextBlock Style="{StaticResource value}" Text="{Binding OriginText}" Margin="2,6,0,0"/>
-                            <TextBlock Style="{StaticResource hint}"
-                                       Text="原点坐标系的旋转/倾斜（Cognex 面板中的 旋转 / 倾斜）尚未实现，按 0° 处理。"/>
-                        </StackPanel>
-                    </Expander>
-                    <Expander Header="3. 训练参数">
-                        <StackPanel>
-                            <TextBlock Text="训练算法  PatMax（PatQuick / PatFlex 未实现）" Style="{StaticResource lbl}"/>
-                            <CheckBox Content="忽略极性 IgnorePolarity" IsChecked="{Binding IgnorePolarity}"
-                                      ToolTip="反光、剪影场景需要；会降低区分力"/>
-                            <CheckBox Content="自动边缘阈值 AutoEdgeThreshold" IsChecked="{Binding AutoEdgeThreshold}"
-                                      ToolTip="按图像梯度分布自动定门限，欠曝帧才下调"/>
-                            <TextBlock Text="{Binding EdgeThreshold, StringFormat='边缘阈值：{0:F1}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="1" Maximum="60" Value="{Binding EdgeThreshold}" TickFrequency="1"/>
-                            <TextBlock Text="{Binding Grain, StringFormat='粒度 Grain：{0:F1}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="1" Maximum="10" Value="{Binding Grain}" TickFrequency="0.5"/>
-                            <TextBlock Text="{Binding TrainMaxFeatures, StringFormat='特征数上限：{0}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="100" Maximum="2000" Value="{Binding TrainMaxFeatures}" TickFrequency="50"/>
-                            <TextBlock Text="{Binding TrainMinSpacing, StringFormat='特征最小间距：{0:F1} px'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="1" Maximum="8" Value="{Binding TrainMinSpacing}" TickFrequency="0.5"/>
-                        </StackPanel>
-                    </Expander>
-
-                    <Expander Header="4. 查找参数">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource hint}"
-                                       Text="搜索覆盖整幅图；角度/缩放区间越窄越快。"/>
-                            <TextBlock Text="{Binding RotationAngleMin, StringFormat='旋转最小：{0:F0}°'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="-180" Maximum="0" Value="{Binding RotationAngleMin}" TickFrequency="5"/>
-                            <TextBlock Text="{Binding RotationAngleMax, StringFormat='旋转最大：{0:F0}°'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="0" Maximum="180" Value="{Binding RotationAngleMax}" TickFrequency="5"/>
-                            <TextBlock Text="{Binding ScaleMin, StringFormat='缩放最小：{0:F2}×'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="0.5" Maximum="1.0" Value="{Binding ScaleMin}" TickFrequency="0.01"/>
-                            <TextBlock Text="{Binding ScaleMax, StringFormat='缩放最大：{0:F2}×'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="1.0" Maximum="2.0" Value="{Binding ScaleMax}" TickFrequency="0.01"/>
-                            <TextBlock Text="{Binding ApproximateNumberToFind, StringFormat='预期数量：{0}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="1" Maximum="20" Value="{Binding ApproximateNumberToFind}" TickFrequency="1"/>
-                            <TextBlock Text="{Binding XYOverlap, StringFormat='XY 重叠：{0:F2}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="0" Maximum="1" Value="{Binding XYOverlap}" TickFrequency="0.05"/>
-                            <TextBlock Text="{Binding TimeoutMs, StringFormat='超时：{0:F0} ms'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="100" Maximum="30000" Value="{Binding TimeoutMs}" TickFrequency="500"/>
-                        </StackPanel>
-                    </Expander>
-
-                    <Expander Header="5. 评分参数">
-                        <StackPanel>
-                            <TextBlock Text="{Binding AcceptThreshold, StringFormat='接受阈值：{0:F2}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="0" Maximum="1" Value="{Binding AcceptThreshold}" TickFrequency="0.01"/>
-                            <TextBlock Style="{StaticResource hint}" Text="0.7 为生产建议值：低于它的结果不会出现在表格里。"/>
-                            <TextBlock Text="{Binding MinPolarityCoherence, StringFormat='极性一致性门：{0:F2}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="0" Maximum="1" Value="{Binding MinPolarityCoherence}" TickFrequency="0.05"/>
-                            <TextBlock Style="{StaticResource hint}"
-                                       Text="真实实例≈1.00，边缘密度相似的伪解≈0.5；忽略极性时建议 0.75。"/>
-                            <TextBlock Text="{Binding ContrastThreshold, StringFormat='对比度阈值：{0:F2}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="0" Maximum="1" Value="{Binding ContrastThreshold}" TickFrequency="0.01"/>
-                            <CheckBox Content="杂波计入评分 ScoreUsingClutter" IsChecked="{Binding ScoreUsingClutter}"/>
-                            <TextBlock Text="{Binding MaxResults, StringFormat='最大结果数：{0}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="1" Maximum="50" Value="{Binding MaxResults}" TickFrequency="1"/>
-                        </StackPanel>
-                    </Expander>
-
-                    <Expander Header="6. 性能 / 精度">
-                        <StackPanel>
-                            <TextBlock Text="{Binding PrecisionStep, StringFormat='粗层位置步长：{0} px'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="1" Maximum="8" Value="{Binding PrecisionStep}" TickFrequency="1"/>
-                            <CheckBox Content="亚像素细化" IsChecked="{Binding SubpixelRefinement}"/>
-                            <CheckBox Content="候选聚类" IsChecked="{Binding EnableClustering}"/>
-                            <TextBlock Text="{Binding ClusterRadius, StringFormat='聚类半径：{0:F0} px'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="2" Maximum="40" Value="{Binding ClusterRadius}" TickFrequency="2"/>
-                            <TextBlock Text="{Binding PreSmoothSigma, StringFormat='高斯预平滑 σ：{0:F1}'}" Style="{StaticResource lbl}"/>
-                            <Slider Minimum="0" Maximum="3" Value="{Binding PreSmoothSigma}" TickFrequency="0.1"/>
-                            <CheckBox Content="SIMD 加速" IsChecked="{Binding UseSimd}"/>
-                            <CheckBox Content="并行处理" IsChecked="{Binding UseParallel}"/>
-                        </StackPanel>
-                    </Expander>
-
-                    <Expander Header="7. 参数预设">
-                        <StackPanel>
-                            <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
-                                      DisplayMemberPath="Name" ToolTip="{Binding SelectedPreset.Description}"/>
-                            <TextBlock Text="{Binding SelectedPreset.Description}" Style="{StaticResource hint}"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                <Button Content="应用" Click="ApplyPreset_Click"/>
-                                <Button Content="新建" Command="{Binding NewPresetCommand}"/>
-                                <Button Content="保存" Command="{Binding SavePresetCommand}"/>
-                                <Button Content="删除" Command="{Binding DeletePresetCommand}"/>
+                                <Border Background="#1F1F23" BorderBrush="{StaticResource BBorder}" BorderThickness="1"
+                                        CornerRadius="3" Padding="6" Margin="2,8,2,0">
+                                    <StackPanel>
+                                        <CheckBox Content="启用掩膜（训练 + 运行）" IsChecked="{Binding UseMask}"/>
+                                        <TextBlock Text="{Binding MaskSummary}" Style="{StaticResource hint}"/>
+                                        <TextBlock Text="{Binding BrushRadius, StringFormat='笔刷半径：{0:F0} px'}"
+                                                   Style="{StaticResource lbl}"/>
+                                        <Slider Minimum="2" Maximum="60" Value="{Binding BrushRadius}" TickFrequency="2"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <CheckBox Content="擦除（标为 Don't care）" IsChecked="{Binding MaskErase}"
+                                                      ToolTip="勾选=涂抹区域被忽略；取消=涂抹区域恢复参与"/>
+                                            <Button Content="清空" Command="{Binding ClearMaskCommand}" Margin="8,0,0,0"/>
+                                        </StackPanel>
+                                        <TextBlock Text="被掩特征计分方式" Style="{StaticResource lbl}"/>
+                                        <ComboBox SelectedIndex="{Binding MaskScoringIndex}">
+                                            <ComboBoxItem Content="不计分 DoNotScoreFeatures"/>
+                                            <ComboBoxItem Content="记为杂波 ScoreFeaturesAsClutter"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
-                            <TextBlock Style="{StaticResource hint}" Margin="2,6,2,0"
-                                       Text="预设保存在本机 AppData，重启后自动加载。"/>
-                        </StackPanel>
-                    </Expander>
-                </StackPanel>
-            </ScrollViewer>
+                        </Expander>
+
+                        <Expander Header="2. 训练">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource hint}"
+                                           Text="结果里的 (X, Y) 就是这个原点在图像中的位置。缺省取训练区中心。"/>
+                                <Grid Margin="0,2,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="56"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="原点 X" Style="{StaticResource lbl}"/>
+                                    <TextBox Grid.Column="1" Margin="2"
+                                             Text="{Binding OriginX, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"/>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="56"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="原点 Y" Style="{StaticResource lbl}"/>
+                                    <TextBox Grid.Column="1" Margin="2"
+                                             Text="{Binding OriginY, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"/>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <CheckBox Content="跟随训练区中心" IsChecked="{Binding OriginFollowsCenter}"/>
+                                    <Button Content="中心原点" Command="{Binding CenterOriginCommand}"/>
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource value}" Text="{Binding OriginText}" Margin="2,4,0,0"/>
+
+                                <Separator Margin="2,8,2,4"/>
+                                <CheckBox Content="忽略极性 IgnorePolarity" IsChecked="{Binding IgnorePolarity}"
+                                          ToolTip="反光、剪影场景需要；会降低区分力"/>
+                                <CheckBox Content="自动边缘阈值 AutoEdgeThreshold" IsChecked="{Binding AutoEdgeThreshold}"
+                                          ToolTip="按图像梯度分布自动定门限，欠曝帧才下调"/>
+                                <TextBlock Text="{Binding EdgeThreshold, StringFormat='边缘阈值：{0:F1}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="1" Maximum="60" Value="{Binding EdgeThreshold}" TickFrequency="1"/>
+                                <TextBlock Text="{Binding Grain, StringFormat='粒度 Grain：{0:F1}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="1" Maximum="10" Value="{Binding Grain}" TickFrequency="0.5"/>
+                                <TextBlock Text="{Binding TrainMaxFeatures, StringFormat='特征数上限：{0}（越小越抗光照变化）'}"
+                                           Style="{StaticResource lbl}"/>
+                                <Slider Minimum="40" Maximum="600" Value="{Binding TrainMaxFeatures}" TickFrequency="10"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <Expander Header="3. 查找">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource hint}"
+                                           Text="区间越窄越快；缩放区间过宽会引入『缩小副本』退化解。"/>
+                                <TextBlock Text="{Binding RotationAngleMin, StringFormat='旋转最小：{0:F0}°'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="-180" Maximum="0" Value="{Binding RotationAngleMin}" TickFrequency="5"/>
+                                <TextBlock Text="{Binding RotationAngleMax, StringFormat='旋转最大：{0:F0}°'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0" Maximum="180" Value="{Binding RotationAngleMax}" TickFrequency="5"/>
+                                <TextBlock Text="{Binding ScaleMin, StringFormat='缩放最小：{0:F2}×'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0.4" Maximum="1.0" Value="{Binding ScaleMin}" TickFrequency="0.01"/>
+                                <TextBlock Text="{Binding ScaleMax, StringFormat='缩放最大：{0:F2}×'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="1.0" Maximum="2.0" Value="{Binding ScaleMax}" TickFrequency="0.01"/>
+                                <TextBlock Text="{Binding ApproximateNumberToFind, StringFormat='预期数量：{0}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="1" Maximum="20" Value="{Binding ApproximateNumberToFind}" TickFrequency="1"/>
+                                <TextBlock Text="{Binding XYOverlap, StringFormat='XY 重叠：{0:F2}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0" Maximum="1" Value="{Binding XYOverlap}" TickFrequency="0.05"/>
+                                <TextBlock Text="{Binding TimeoutText}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="100" Maximum="30000" Value="{Binding TimeoutMs}" TickFrequency="500"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <Expander Header="4. 评分">
+                            <StackPanel>
+                                <TextBlock Text="{Binding AcceptThreshold, StringFormat='接受阈值：{0:F2}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0" Maximum="1" Value="{Binding AcceptThreshold}" TickFrequency="0.01"/>
+                                <TextBlock Style="{StaticResource hint}" Text="0.70 为生产建议值：低于它的结果不会出现在表格里。"/>
+                                <TextBlock Text="{Binding MinPolarityCoherence, StringFormat='极性一致性门：{0:F2}'}"
+                                           Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0" Maximum="1" Value="{Binding MinPolarityCoherence}" TickFrequency="0.05"/>
+                                <TextBlock Style="{StaticResource hint}"
+                                           Text="真实实例≈1.00，边缘密度相似的伪解≈0.5；忽略极性时建议 0.75。"/>
+                                <TextBlock Text="{Binding ContrastThreshold, StringFormat='对比度阈值：{0:F2}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0" Maximum="1" Value="{Binding ContrastThreshold}" TickFrequency="0.01"/>
+                                <CheckBox Content="杂波计入评分 ScoreUsingClutter" IsChecked="{Binding ScoreUsingClutter}"/>
+                                <TextBlock Text="{Binding ScoreExponentN, StringFormat='评分指数 N：{0:F1}（越小越严）'}"
+                                           Style="{StaticResource lbl}"/>
+                                <Slider Minimum="1" Maximum="4" Value="{Binding ScoreExponentN}" TickFrequency="0.5"/>
+                                <TextBlock Text="{Binding MaxResults, StringFormat='最大结果数：{0}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="1" Maximum="50" Value="{Binding MaxResults}" TickFrequency="1"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <Expander Header="5. 高级（一般不需要改）">
+                            <StackPanel>
+                                <TextBlock Text="{Binding PrecisionStep, StringFormat='粗层位置步长：{0} px（1 最彻底）'}"
+                                           Style="{StaticResource lbl}"/>
+                                <Slider Minimum="1" Maximum="8" Value="{Binding PrecisionStep}" TickFrequency="1"/>
+                                <TextBlock Text="{Binding CoarseAcceptThreshold, StringFormat='粗层接受阈值：{0:F2}'}"
+                                           Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0.1" Maximum="0.9" Value="{Binding CoarseAcceptThreshold}" TickFrequency="0.01"/>
+                                <TextBlock Text="{Binding MaxCandidates, StringFormat='候选假设数：{0}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="4" Maximum="64" Value="{Binding MaxCandidates}" TickFrequency="4"/>
+                                <TextBlock Text="{Binding TrainFeatureFloor, StringFormat='训练边缘门限：{0:F2}（占最强边比例）'}"
+                                           Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0" Maximum="0.6" Value="{Binding TrainFeatureFloor}" TickFrequency="0.02"/>
+                                <TextBlock Text="{Binding TrainMinSpacing, StringFormat='特征最小间距：{0:F1} px'}"
+                                           Style="{StaticResource lbl}"/>
+                                <Slider Minimum="1" Maximum="8" Value="{Binding TrainMinSpacing}" TickFrequency="0.5"/>
+                                <TextBlock Text="{Binding ClusterRadius, StringFormat='聚类半径：{0:F0} px'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="2" Maximum="40" Value="{Binding ClusterRadius}" TickFrequency="2"/>
+                                <TextBlock Text="{Binding PreSmoothSigma, StringFormat='高斯预平滑 σ：{0:F1}'}" Style="{StaticResource lbl}"/>
+                                <Slider Minimum="0" Maximum="3" Value="{Binding PreSmoothSigma}" TickFrequency="0.1"/>
+                                <CheckBox Content="SIMD 加速" IsChecked="{Binding UseSimd}"/>
+                                <CheckBox Content="并行处理" IsChecked="{Binding UseParallel}"/>
+                                <TextBlock Style="{StaticResource hint}"
+                                           Text="亚像素细化与候选聚类固定开启（关闭只会变差，故不显示）。"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <Expander Header="6. 参数预设">
+                            <StackPanel>
+                                <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
+                                          DisplayMemberPath="Name" ToolTip="{Binding SelectedPreset.Description}"/>
+                                <TextBlock Text="{Binding SelectedPreset.Description}" Style="{StaticResource hint}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <Button Content="应用" Click="ApplyPreset_Click"/>
+                                    <Button Content="新建" Command="{Binding NewPresetCommand}"/>
+                                    <Button Content="保存" Command="{Binding SavePresetCommand}"/>
+                                    <Button Content="删除" Command="{Binding DeletePresetCommand}"/>
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource hint}" Margin="2,6,2,0"
+                                           Text="预设保存在本机 AppData，重启后自动加载。"/>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
 
             <!-- ===== Image + results ===== -->
             <Grid Grid.Column="1" Margin="4">
