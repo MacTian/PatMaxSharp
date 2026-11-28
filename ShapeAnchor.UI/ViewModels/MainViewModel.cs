@@ -24,6 +24,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 {
     private readonly ShapeAnchorTool _tool = new();
     private BitmapSource _image;
+    private GrayImage _imageGray;      // decoded once per image: cursor readout and runs reuse it
     private string _status = "就绪";
     private Rect? _trainRegion;
     private Rect? _searchRegion;
@@ -456,6 +457,28 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _mouseInfo = "";
+    /// <summary>Live cursor readout: image coordinates and the grey value under the pointer.</summary>
+    public string MouseInfoText
+    {
+        get => _mouseInfo;
+        private set => Set(ref _mouseInfo, value);
+    }
+
+    /// <summary>Called by the canvas on every mouse move.</summary>
+    public void UpdateCursor(double x, double y)
+    {
+        if (_imageGray == null) { MouseInfoText = ""; return; }
+        int ix = (int)Math.Floor(x), iy = (int)Math.Floor(y);
+        if (ix < 0 || iy < 0 || ix >= _imageGray.Width || iy >= _imageGray.Height)
+        {
+            MouseInfoText = $"X {x,6:F0}  Y {y,6:F0}   （图像外）";
+            return;
+        }
+        byte grey = _imageGray.Data[iy * _imageGray.Width + ix];
+        MouseInfoText = $"X {ix,4}  Y {iy,4}   灰度 {grey,3}";
+    }
+
     /// <summary>Recompute the readout after the canvas painted a stroke.</summary>
     public void RefreshMaskSummary() => OnPropertyChanged(nameof(MaskSummary));
 
@@ -750,6 +773,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Image = bmp;
             ImagePixelWidth = bmp.PixelWidth;
             ImagePixelHeight = bmp.PixelHeight;
+            _imageGray = ToGray(bmp);
             ResetMask();          // a mask belongs to one image: start from "all Care"
             MaskMode = false;
             Status = $"已加载: {System.IO.Path.GetFileName(path)} ({bmp.PixelWidth}×{bmp.PixelHeight})";

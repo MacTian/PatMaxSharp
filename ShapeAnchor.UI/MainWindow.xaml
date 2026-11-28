@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:ShapeAnchor.Controls;assembly=ShapeAnchor.Controls"
         xmlns:local="clr-namespace:ShapeAnchor.UI"
-        Title="ShapeAnchor — 几何特征匹配引擎" Height="900" Width="1440"
+        Title="ShapeAnchor — 几何特征匹配引擎" Height="920" Width="1460"
         WindowStartupLocation="CenterScreen"
         Background="#1B1B1D" Foreground="#E8E8E8"
         FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="12">
@@ -350,10 +350,15 @@
         <KeyBinding Key="L" Modifiers="Ctrl" Command="{Binding ClearCommand}"/>
     </Window.InputBindings>
 
-    <DockPanel Background="{StaticResource BWindow}">
+    <Grid Background="{StaticResource BWindow}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
         <!-- ===== Toolbar ===== -->
-        <Border DockPanel.Dock="Top" Background="{StaticResource BPanel}"
+        <Border Grid.Row="0" Background="{StaticResource BPanel}"
                 BorderBrush="{StaticResource BBorder}" BorderThickness="0,0,0,1" Padding="6,6">
             <DockPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
@@ -371,8 +376,8 @@
         </Border>
 
         <!-- ===== Status bar ===== -->
-        <Border DockPanel.Dock="Bottom" Background="{StaticResource BPanel}"
-                BorderBrush="{StaticResource BBorder}" BorderThickness="0,1,0,0" Padding="8,4">
+        <Border Grid.Row="2" Height="26" VerticalAlignment="Bottom" Background="{StaticResource BPanel}"
+                BorderBrush="{StaticResource BBorder}" BorderThickness="0,1,0,0" Padding="8,2">
             <DockPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                     <TextBlock Text="{Binding ParamsSummary}" Foreground="{StaticResource BSub}" FontSize="11"/>
@@ -382,6 +387,8 @@
                     <TextBlock Text=" × " Foreground="{StaticResource BSub}" FontSize="11"/>
                     <TextBlock Text="{Binding ImagePixelHeight}" Foreground="{StaticResource BSub}" FontSize="11"/>
                     <TextBlock Text=" px" Foreground="{StaticResource BSub}" FontSize="11" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding MouseInfoText}" Foreground="{StaticResource BAccent}" FontSize="11"
+                               FontFamily="Consolas, Microsoft YaHei UI" Margin="0,0,16,0"/>
                     <TextBlock Text="处理 " Foreground="{StaticResource BSub}" FontSize="11"/>
                     <TextBlock x:Name="timeText" Foreground="{StaticResource BAccent}" FontSize="11" FontWeight="Bold"/>
                     <TextBlock Text=" ms   吞吐 " Foreground="{StaticResource BSub}" FontSize="11"/>
@@ -392,7 +399,7 @@
             </DockPanel>
         </Border>
 
-        <Grid>
+        <Grid Grid.Row="1" ClipToBounds="True">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="352"/>
                 <ColumnDefinition Width="*"/>
@@ -579,7 +586,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" MinHeight="200"/>
                     <RowDefinition Height="6"/>
-                    <RowDefinition Height="230" MinHeight="110"/>
+                    <RowDefinition Height="200" MinHeight="100"/>
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0" Background="#0E0E10" BorderBrush="{StaticResource BBorder}"
@@ -667,5 +674,5 @@
                 </Border>
             </Grid>
         </Grid>
-    </DockPanel>
+    </Grid>
 </Window>

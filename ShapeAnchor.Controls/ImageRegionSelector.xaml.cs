@@ -482,8 +482,16 @@ public partial class ImageRegionSelector : UserControl
         _canvas.CaptureMouse();
     }
 
+    /// <summary>Mouse position in image pixels (may be outside the image).</summary>
+    public event Action<double, double> CursorMoved;
+
     private void OnMouseMove(object sender, MouseEventArgs e)
     {
+        if (Source != null && CursorMoved != null)
+        {
+            var p = ToImage(e.GetPosition(_canvas));
+            CursorMoved(p.X, p.Y);
+        }
         if (_paintingMask) { PaintMask(e.GetPosition(_canvas)); return; }
         if (!_isDragging) return;
         _dragLast = ToImage(e.GetPosition(_canvas));

@@ -51,6 +51,7 @@ public partial class MainWindow : Window
         rbSearch.Checked += (_, _) => { viewer.SelectMode = RegionKind.Search; viewer.MaskEditing = false; };
         rbMask.Checked += (_, _) => { viewer.MaskEditing = true; _vm.UseMask = true; _vm.MaskMode = true; };
         viewer.MaskPainted += () => _vm.RefreshMaskSummary();
+        viewer.CursorMoved += (x, y) => _vm.UpdateCursor(x, y);
 
         viewer.RegionChanged += _ => _vm.RefreshRegions();
 
