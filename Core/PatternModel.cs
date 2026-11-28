@@ -102,6 +102,17 @@ public sealed class PatternModel
     public double Grain { get; set; } = 1.0;
 
     /// <summary>
+    /// Mask actually used for training, cropped to <see cref="Roi"/> (0 = Don't care).
+    /// Exposed the way GetTrainedPatternImageMask() exposes it in the original: the effective
+    /// mask, not the one the caller passed in.
+    /// </summary>
+    public byte[] Mask { get; set; }
+
+    public int MaskWidth => Roi.Width;
+    public int MaskHeight => Roi.Height;
+    public bool HasMask => Mask != null;
+
+    /// <summary>
     /// Ignore edge polarity: the matcher compares |directional response| instead of the signed
     /// one, so a part seen as dark-on-light also matches when it is seen as light-on-dark
     /// (backlight, silhouette, inverted illumination). This is CogPMAlignPattern.IgnorePolarity,

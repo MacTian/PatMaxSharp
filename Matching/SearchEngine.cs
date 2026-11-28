@@ -105,7 +105,9 @@ public sealed class SearchEngine
         foreach (var h in hypotheses)
         {
             var om = BuildOrientedModel(model, int.MaxValue, h.Angle, h.Scale, pyramid.Scales[0]);
-            ScoreAtBilinear(level0, om, h.X, h.Y, invRef0, minResp0, out int m, out double mw, out _, out _);
+            ScoreAtBilinear(level0, om, h.X, h.Y, invRef0, minResp0,
+                opt.SearchMask, opt.SearchMaskWidth, opt.SearchMaskHeight, opt.MaskScoring,
+                out int m, out double mw, out _, out _, out _, out _);
             double cov = mw / Math.Max(1e-6, om.TotalWeight);
             double s = Math.Pow(Math.Clamp(cov, 0, 1), exponent0);
             if (s >= preGate) pre.Add((h, s));
@@ -345,14 +347,16 @@ public sealed class SearchEngine
 
     /// <summary>Clamped bilinear coverage score - the final scoring criterion.</summary>
     private static double ScoreAtBilinear(EdgeMap map, OrientedModel om, double cx, double cy, float invRef,
-        double minResponse, out int matchedCount, out double matchedWeight, out double contrastSum,
-        out double polarityCoherence)
+        double minResponse, byte[] mask, int maskW, int maskH, MaskScoringMethod maskScoring,
+        out int matchedCount, out double matchedWeight, out double contrastSum,
+        out double polarityCoherence, out double visibleWeight, out int visibleCount)
     {
         var gx = map.Gx; var gy = map.Gy;
         int w = map.Width, h = map.Height;
         double acc = 0, wsum = 0, contrast = 0;
         double posWeight = 0, negWeight = 0;
-        int matched = 0;
+        double visible = 0;
+        int matched = 0, visibleN = 0;
         int n = om.Count;
 
         for (int f = 0; f < n; f++)
@@ -366,6 +370,18 @@ public sealed class SearchEngine
 
             double gxb = (gx[i0] * (1 - fx) + gx[i0 + 1] * fx) * (1 - fy) + (gx[i1] * (1 - fx) + gx[i1 + 1] * fx) * fy;
             double gyb = (gy[i0] * (1 - fx) + gy[i0 + 1] * fx) * (1 - fy) + (gy[i1] * (1 - fx) + gy[i1 + 1] * fx) * fy;
+
+            // Care / Don't-care at run time. A feature over a Don't-care pixel is either removed
+            // from the score (numerator *and* denominator) or kept as clutter, which is the
+            // difference between DoNotScoreFeatures and ScoreFeaturesAsClutter.
+            if (mask != null)
+            {
+                int mx = (int)px, my = (int)py;
+                bool care = mx >= 0 && my >= 0 && mx < maskW && my < maskH && mask[my * maskW + mx] != 0;
+                if (!care && maskScoring == MaskScoringMethod.DoNotScoreFeatures) continue;
+                visible += om.W[f];
+                visibleN++;
+            }
 
             double signed = gxb * om.Nx[f] + gyb * om.Ny[f];
             double d = om.Agnostic ? Math.Abs(signed) : signed;
@@ -387,7 +403,9 @@ public sealed class SearchEngine
         matchedWeight = wsum;
         contrastSum = contrast;
         polarityCoherence = wsum > 0 ? Math.Max(posWeight, negWeight) / wsum : 0;
-        return acc / om.TotalWeight;
+        visibleWeight = mask != null ? visible : om.TotalWeight;
+        visibleCount = mask != null ? visibleN : om.Count;
+        return acc / Math.Max(1e-9, visibleWeight);
     }
 
     /// <summary>
@@ -608,8 +626,14 @@ public sealed class SearchEngine
         {
             var om = BuildOrientedModel(model, opt.CoarseFeatureCount, cand.Angle, cand.Scale, pixelScale);
             double coverage = ScoreAtBilinear(map, om, cand.X, cand.Y, invRef, coarseFloor,
-                                              out _, out _, out _, out double coherence);
+                                              opt.SearchMask, opt.SearchMaskWidth, opt.SearchMaskHeight,
+                                              opt.MaskScoring,
+                                              out _, out _, out _, out double coherence,
+                                              out double coarseVisible, out _);
             if (coverage < coarseMin) continue;
+            // A position where the mask hides most of the model would score high on very little
+            // evidence, so require the model to be substantially visible before it can compete.
+            if (opt.SearchMask != null && coarseVisible < 0.35 * om.TotalWeight) continue;
             var scoredHyp = cand;
             // Polarity-agnostic ranking. Coverage alone cannot tell a real instance from a pose
             // that only shares edge density, and both score ~1.0, so the wrong one used to win the
@@ -806,17 +830,25 @@ public sealed class SearchEngine
 
         var omFinal = BuildOrientedModel(model, int.MaxValue, angle, scale, pixelScale);
         double minResp = Math.Max(0.5, stats.MagnitudeReference * opt.ContrastThreshold);
-        ScoreAtBilinear(map, omFinal, x, y, invRef, minResp, out int matched, out double matchedWeight,
-            out double contrastSum, out double polarityCoherence);
+        ScoreAtBilinear(map, omFinal, x, y, invRef, minResp,
+            opt.SearchMask, opt.SearchMaskWidth, opt.SearchMaskHeight, opt.MaskScoring,
+            out int matched, out double matchedWeight, out double contrastSum, out double polarityCoherence,
+            out double visibleWeight, out int visibleCount);
 
-        double coverage = matchedWeight / Math.Max(1e-6, omFinal.TotalWeight);
-        int bad = omFinal.Count - matched;
-        double clutterFraction = opt.UseClutter && omFinal.Count > 0
-            ? Math.Clamp((double)bad / omFinal.Count * 0.5, 0, 1)
+        double totalWeight = visibleWeight > 0 ? visibleWeight : omFinal.TotalWeight;
+        int totalCount = visibleCount > 0 ? visibleCount : omFinal.Count;
+        double coverage = matchedWeight / Math.Max(1e-6, totalWeight);
+        int bad = Math.Max(0, totalCount - matched);
+
+        // A position where the mask hides most of the model would score highly on very little
+        // evidence, so it is not allowed to compete.
+        bool tooLittleVisible = opt.SearchMask != null && visibleWeight < 0.35 * omFinal.TotalWeight;
+        double clutterFraction = opt.UseClutter && totalCount > 0
+            ? Math.Clamp((double)bad / totalCount * 0.5, 0, 1)
             : 0.0;
 
         double exponent = 1.0 / Math.Max(1.0, model.N);
-        var breakdown = Scorer.Score(matchedWeight, omFinal.TotalWeight, matched, omFinal.Count,
+        var breakdown = Scorer.Score(matchedWeight, totalWeight, matched, totalCount,
             clutterFraction, 1.0, exponent);
         double score = breakdown.Score;
         coverage = breakdown.Coverage;
@@ -834,7 +866,8 @@ public sealed class SearchEngine
             Scale = scale,
             MatchedFeatures = matched,
             BadFeatures = bad,
-            Accepted = score >= opt.AcceptThreshold
+            Accepted = !tooLittleVisible
+                    && score >= opt.AcceptThreshold
                     && contrast >= opt.ContrastThreshold
                     && (opt.MinPolarityCoherence <= 0 || polarityCoherence >= opt.MinPolarityCoherence)
                     && InAngleWindow(NormalizeAngle(angle) * 180.0 / Math.PI, opt.AngleMin, opt.AngleMax),

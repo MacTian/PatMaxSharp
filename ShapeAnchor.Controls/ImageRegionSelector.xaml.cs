@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
 namespace ShapeAnchor.Controls;
@@ -21,6 +22,10 @@ public partial class ImageRegionSelector : UserControl
 {
     private Canvas _canvas = null!;
     private ImageBrush _brush = null!;
+
+    private Image _maskImage = null!;
+    private WriteableBitmap _maskBitmap;
+    private bool _paintingMask;
 
     private Rectangle _trainRect = null!;
     private Rectangle _searchRect = null!;
@@ -97,6 +102,50 @@ public partial class ImageRegionSelector : UserControl
     {
         get => (List<OutlineFeature>)GetValue(PatternOutlineProperty);
         set => SetValue(PatternOutlineProperty, value);
+    }
+
+    /// <summary>Care / Don't-care mask over the image, one byte per pixel, 0 = Don't care.</summary>
+    public static readonly DependencyProperty MaskBytesProperty =
+        DependencyProperty.Register(nameof(MaskBytes), typeof(byte[]), typeof(ImageRegionSelector),
+            new PropertyMetadata(null, (d, e) => ((ImageRegionSelector)d).RebuildMaskOverlay()));
+
+    public byte[] MaskBytes
+    {
+        get => (byte[])GetValue(MaskBytesProperty);
+        set => SetValue(MaskBytesProperty, value);
+    }
+
+    /// <summary>When true, dragging paints the mask instead of selecting a region.</summary>
+    public static readonly DependencyProperty MaskEditingProperty =
+        DependencyProperty.Register(nameof(MaskEditing), typeof(bool), typeof(ImageRegionSelector),
+            new PropertyMetadata(false));
+
+    public bool MaskEditing
+    {
+        get => (bool)GetValue(MaskEditingProperty);
+        set => SetValue(MaskEditingProperty, value);
+    }
+
+    /// <summary>Brush radius in image pixels.</summary>
+    public static readonly DependencyProperty BrushRadiusProperty =
+        DependencyProperty.Register(nameof(BrushRadius), typeof(double), typeof(ImageRegionSelector),
+            new PropertyMetadata(12.0));
+
+    public double BrushRadius
+    {
+        get => (double)GetValue(BrushRadiusProperty);
+        set => SetValue(BrushRadiusProperty, value);
+    }
+
+    /// <summary>True erases (marks Don't care), false marks Care.</summary>
+    public static readonly DependencyProperty MaskEraseProperty =
+        DependencyProperty.Register(nameof(MaskErase), typeof(bool), typeof(ImageRegionSelector),
+            new PropertyMetadata(true));
+
+    public bool MaskErase
+    {
+        get => (bool)GetValue(MaskEraseProperty);
+        set => SetValue(MaskEraseProperty, value);
     }
 
     /// <summary>Training origin in image pixels, drawn as a cross so it is visible while framing.</summary>
@@ -182,6 +231,16 @@ public partial class ImageRegionSelector : UserControl
             StrokeDashArray = new DoubleCollection { 4, 3 },
             Visibility = Visibility.Collapsed
         };
+        // mask overlay sits under the region rectangles: translucent red where Don't care
+        _maskImage = new Image
+        {
+            Stretch = Stretch.Fill,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            IsHitTestVisible = false
+        };
+        _canvas.Children.Add(_maskImage);
+
         _canvas.Children.Add(_trainRect);
         _canvas.Children.Add(_searchRect);
         _canvas.Children.Add(_dragRect);
@@ -221,6 +280,11 @@ public partial class ImageRegionSelector : UserControl
         if (_canvas == null || ImageWidth <= 0 || ImageHeight <= 0) return;
         _canvas.Width = ImageWidth * Zoom;
         _canvas.Height = ImageHeight * Zoom;
+        if (_maskImage != null)
+        {
+            _maskImage.Width = _canvas.Width;
+            _maskImage.Height = _canvas.Height;
+        }
         Redraw();
     }
 
@@ -348,6 +412,55 @@ public partial class ImageRegionSelector : UserControl
         _canvas.Children.Add(arrow);
     }
 
+    /// <summary>Raised when the user finishes a mask stroke, so the view model can mirror it.</summary>
+    public event Action MaskPainted;
+
+    /// <summary>Paint (or erase) a filled circle of <see cref="BrushRadius"/> at a canvas point.</summary>
+    private void PaintMask(Point canvasPoint)
+    {
+        var mask = MaskBytes;
+        if (mask == null || ImageWidth <= 0 || ImageHeight <= 0) return;
+
+        var p = ToImage(canvasPoint);
+        double r = Math.Max(1.0, BrushRadius);
+        int cx = (int)Math.Round(p.X), cy = (int)Math.Round(p.Y);
+        int ri = (int)Math.Ceiling(r);
+        byte value = MaskErase ? (byte)0 : (byte)1;
+
+        for (int y = cy - ri; y <= cy + ri; y++)
+        {
+            if (y < 0 || y >= ImageHeight) continue;
+            for (int x = cx - ri; x <= cx + ri; x++)
+            {
+                if (x < 0 || x >= ImageWidth) continue;
+                double dx = x - cx, dy = y - cy;
+                if (dx * dx + dy * dy > r * r) continue;
+                mask[y * ImageWidth + x] = value;
+            }
+        }
+        RebuildMaskOverlay();
+    }
+
+    /// <summary>Draw the Don''t-care area as translucent red; Care is left untouched.</summary>
+    private void RebuildMaskOverlay()
+    {
+        if (_maskImage == null) return;
+        var mask = MaskBytes;
+        if (mask == null || ImageWidth <= 0 || ImageHeight <= 0)
+        {
+            _maskImage.Source = null;
+            return;
+        }
+
+        if (_maskBitmap == null || _maskBitmap.PixelWidth != ImageWidth || _maskBitmap.PixelHeight != ImageHeight)
+            _maskBitmap = new WriteableBitmap(ImageWidth, ImageHeight, 96, 96, PixelFormats.Bgra32, null);
+
+        var pixels = new int[ImageWidth * ImageHeight];
+        for (int i = 0; i < pixels.Length; i++)
+            pixels[i] = mask[i] == 0 ? unchecked((int)0x66FF2020) : 0;   // ARGB: red, ~40% alpha
+        _maskBitmap.WritePixels(new Int32Rect(0, 0, ImageWidth, ImageHeight), pixels, ImageWidth * 4, 0);
+        _maskImage.Source = _maskBitmap;
+    }
     // ------------------------------------------------------------------
     //  Mouse: canvas / Zoom = image pixels
     // ------------------------------------------------------------------
@@ -360,6 +473,7 @@ public partial class ImageRegionSelector : UserControl
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (Source == null) return;
+        if (MaskEditing) { _paintingMask = true; PaintMask(e.GetPosition(_canvas)); _canvas.CaptureMouse(); return; }
         _isDragging = true;
         _dragStart = _dragLast = ToImage(e.GetPosition(_canvas));
         _dragRect.Visibility = Visibility.Visible;
@@ -370,6 +484,7 @@ public partial class ImageRegionSelector : UserControl
 
     private void OnMouseMove(object sender, MouseEventArgs e)
     {
+        if (_paintingMask) { PaintMask(e.GetPosition(_canvas)); return; }
         if (!_isDragging) return;
         _dragLast = ToImage(e.GetPosition(_canvas));
         UpdateDragRect();
@@ -377,6 +492,14 @@ public partial class ImageRegionSelector : UserControl
 
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
+        if (_paintingMask)
+        {
+            _paintingMask = false;
+            _canvas.ReleaseMouseCapture();
+            RebuildMaskOverlay();
+            MaskPainted?.Invoke();
+            return;
+        }
         if (!_isDragging) return;
         _isDragging = false;
         _canvas.ReleaseMouseCapture();

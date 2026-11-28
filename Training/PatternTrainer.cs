@@ -65,7 +65,8 @@ public static class PatternTrainer
         double originX,
         double originY,
         GaborEdgeDetector detector,
-        TrainOptions options = null)
+        TrainOptions options = null,
+        byte[] mask = null)
     {
         var opt = options ?? new TrainOptions();
         var region = roi.Clamp(image.Width, image.Height);
@@ -120,6 +121,7 @@ public static class PatternTrainer
             {
                 int i = y * image.Width + x;
                 if (!edges.IsEdge[i]) continue;
+                if (mask != null && mask[i] == 0) continue;   // Don't care: never enters the model
                 float mag = edges.Magnitude[i];
                 if (mag > maxMag) maxMag = mag;
             }
@@ -132,6 +134,7 @@ public static class PatternTrainer
             {
                 int i = y * image.Width + x;
                 if (!edges.IsEdge[i]) continue;
+                if (mask != null && mask[i] == 0) continue;   // Don't care
                 float mag = edges.Magnitude[i];
                 if (mag < minMag) continue;
 
@@ -218,6 +221,18 @@ public static class PatternTrainer
         }
 
         model.Seal();
+        // Store the effective mask (cropped to the region) so the UI can show what was ignored.
+        if (mask != null)
+        {
+            int mw = Math.Max(0, x1 - x0), mh = Math.Max(0, y1 - y0);
+            if (mw > 0 && mh > 0)
+            {
+                var cropMask = new byte[mw * mh];
+                for (int y = 0; y < mh; y++)
+                    Array.Copy(mask, (y0 + y) * image.Width + x0, cropMask, y * mw, mw);
+                model.Mask = cropMask;
+            }
+        }
         return model;
     }
 

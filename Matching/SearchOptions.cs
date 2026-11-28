@@ -20,6 +20,21 @@ public sealed class SearchOptions
     public double ScaleMax { get; set; } = 1.0;
 
     // ---- acceptance ----
+    /// <summary>
+    /// Run-time Care / Don't-care mask, one byte per pixel, 0 = Don't care (SearchImageMask).
+    /// Null means the whole image is scored, which is the default.
+    /// </summary>
+    public byte[] SearchMask { get; set; }
+
+    public int SearchMaskWidth { get; set; }
+    public int SearchMaskHeight { get; set; }
+
+    /// <summary>
+    /// How features that fall on a Don't-care pixel are treated: excluded from the score entirely
+    /// (DoNotScoreFeatures, the original default) or counted as clutter (ScoreFeaturesAsClutter).
+    /// </summary>
+    public MaskScoringMethod MaskScoring { get; set; } = MaskScoringMethod.DoNotScoreFeatures;
+
     /// <summary>Minimum score to accept a result (acceptThreshold).</summary>
     public double AcceptThreshold { get; set; } = 0.7;
 

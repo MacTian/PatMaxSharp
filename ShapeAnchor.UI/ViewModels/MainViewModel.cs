@@ -37,6 +37,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ClearCommand = new RelayCommand(_ => Clear(), _ => _image != null);
         BatchValidateCommand = new RelayCommand(_ => BatchValidate());
         CenterOriginCommand = new RelayCommand(_ => OriginFollowsCenter = true);
+        ClearMaskCommand = new RelayCommand(_ => ClearMask());
         SavePresetCommand = new RelayCommand(_ => SavePreset());
         NewPresetCommand = new RelayCommand(_ => NewPreset());
         DeletePresetCommand = new RelayCommand(_ => DeletePreset(), _ => SelectedPreset != null && !IsBuiltIn(SelectedPreset));
@@ -426,6 +427,99 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _AcceptThreshold;
         set { if (Set(ref _AcceptThreshold, value)) OnPropertyChanged(nameof(ParamsSummary)); }
     }
+    // ---- Care / Don''t-care mask ----
+    private byte[] _mask;
+    /// <summary>Mask over the loaded image: 0 = Don''t care, 1 = Care. Null until an image is loaded.</summary>
+    public byte[] Mask
+    {
+        get => _mask;
+        set
+        {
+            _mask = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasMask));
+            OnPropertyChanged(nameof(MaskSummary));
+        }
+    }
+
+    public bool HasMask => _mask != null;
+
+    /// <summary>Live readout: how many pixels the mask currently excludes.</summary>
+    public string MaskSummary
+    {
+        get
+        {
+            if (_mask == null) return "无掩膜";
+            int care = 0;
+            foreach (var b in _mask) if (b != 0) care++;
+            return $"掩膜 {ImagePixelWidth}×{ImagePixelHeight}：排除 {_mask.Length - care} px，保留 {care} px";
+        }
+    }
+
+    /// <summary>Recompute the readout after the canvas painted a stroke.</summary>
+    public void RefreshMaskSummary() => OnPropertyChanged(nameof(MaskSummary));
+
+    private bool _useMask;
+    /// <summary>Apply the painted mask to training and to the run.</summary>
+    public bool UseMask
+    {
+        get => _useMask;
+        set { if (Set(ref _useMask, value)) OnPropertyChanged(nameof(MaskEditing)); }
+    }
+
+    private bool _maskMode;
+    /// <summary>Left-drag on the canvas paints the mask instead of selecting a region.</summary>
+    public bool MaskMode
+    {
+        get => _maskMode;
+        set { if (Set(ref _maskMode, value)) OnPropertyChanged(nameof(MaskEditing)); }
+    }
+
+    public bool MaskEditing => _maskMode && _mask != null;
+
+    private bool _maskErase = true;
+    /// <summary>Brush marks Don''t care (true) or restores Care (false).</summary>
+    public bool MaskErase { get => _maskErase; set => Set(ref _maskErase, value); }
+
+    private double _brushRadius = 14;
+    public double BrushRadius { get => _brushRadius; set => Set(ref _brushRadius, value); }
+
+    private int _maskScoringIndex;
+    /// <summary>0 = DoNotScoreFeatures, 1 = ScoreFeaturesAsClutter.</summary>
+    public int MaskScoringIndex { get => _maskScoringIndex; set => Set(ref _maskScoringIndex, value); }
+
+    public ICommand ClearMaskCommand { get; }
+
+    /// <summary>
+    /// Crop the full-image mask down to the training region. The trainer indexes the mask with the
+    /// image it is given, which is the crop, so passing the full-image array directly would read
+    /// the wrong rows and quietly throw away most of the model.
+    /// </summary>
+    private byte[] CropMaskForTrain()
+    {
+        if (!UseMask || Mask == null || TrainRegion is not Rect r) return null;
+        int x0 = Math.Clamp((int)r.X, 0, ImagePixelWidth - 1);
+        int y0 = Math.Clamp((int)r.Y, 0, ImagePixelHeight - 1);
+        int w = Math.Clamp((int)r.Width, 1, ImagePixelWidth - x0);
+        int h = Math.Clamp((int)r.Height, 1, ImagePixelHeight - y0);
+        var crop = new byte[w * h];
+        for (int y = 0; y < h; y++)
+            Array.Copy(Mask, (y0 + y) * ImagePixelWidth + x0, crop, y * w, w);
+        return crop;
+    }
+    private void ResetMask()
+    {
+        if (ImagePixelWidth <= 0 || ImagePixelHeight <= 0) { Mask = null; return; }
+        var m = new byte[ImagePixelWidth * ImagePixelHeight];
+        Array.Fill(m, (byte)1);
+        Mask = m;
+    }
+
+    private void ClearMask()
+    {
+        ResetMask();
+        Status = "掩膜已清空（全部 Care）";
+    }
     private double _MinPolarityCoherence = 0.75;
     /// <summary>
     /// Polarity coherence gate (0..1): share of matched features whose edge points the way the
@@ -575,6 +669,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Image = bmp;
         ImagePixelWidth = bmp.PixelWidth;
         ImagePixelHeight = bmp.PixelHeight;
+        ResetMask();          // a mask belongs to one image: start from "all Care"
+        MaskMode = false;
+        ResetMask();
     }
 
     /// <summary>Result -> marker on the canvas.</summary>
@@ -617,6 +714,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Image = bmp;
             ImagePixelWidth = bmp.PixelWidth;
             ImagePixelHeight = bmp.PixelHeight;
+            ResetMask();          // a mask belongs to one image: start from "all Care"
+            MaskMode = false;
             Status = $"已加载: {System.IO.Path.GetFileName(path)} ({bmp.PixelWidth}×{bmp.PixelHeight})";
             // Keep the trained model and parameters so the user can run directly
             // on the new image. Results from the previous image are cleared.
@@ -856,6 +955,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _tool.PreSmoothSigma = PreSmoothSigma;
         _tool.AcceptThreshold = AcceptThreshold;
         _tool.MinPolarityCoherence = MinPolarityCoherence;
+        _tool.SearchMask = UseMask ? Mask : null;
+        _tool.SearchMaskWidth = UseMask ? ImagePixelWidth : 0;
+        _tool.SearchMaskHeight = UseMask ? ImagePixelHeight : 0;
+        _tool.MaskScoring = MaskScoringIndex == 1
+            ? ShapeAnchor.Matching.MaskScoringMethod.ScoreFeaturesAsClutter
+            : ShapeAnchor.Matching.MaskScoringMethod.DoNotScoreFeatures;
         _tool.ContrastThreshold = ContrastThreshold;
         _tool.RotationAngleMin = RotationAngleMin;
         _tool.RotationAngleMax = RotationAngleMax;
@@ -880,6 +985,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _tool.IgnorePolarity = IgnorePolarity;
         _tool.TrainMaxFeatures = Math.Max(20, TrainMaxFeatures);
         _tool.TrainMinSpacing = Math.Max(1.0, TrainMinSpacing);
+        _tool.TrainMask = CropMaskForTrain();
         return _tool.Train(image, roi, originX, originY, Grain);
     }
 
@@ -896,6 +1002,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _tool.PreSmoothSigma = PreSmoothSigma;
             _tool.AcceptThreshold = AcceptThreshold;
         _tool.MinPolarityCoherence = MinPolarityCoherence;
+        _tool.SearchMask = UseMask ? Mask : null;
+        _tool.SearchMaskWidth = UseMask ? ImagePixelWidth : 0;
+        _tool.SearchMaskHeight = UseMask ? ImagePixelHeight : 0;
+        _tool.MaskScoring = MaskScoringIndex == 1
+            ? ShapeAnchor.Matching.MaskScoringMethod.ScoreFeaturesAsClutter
+            : ShapeAnchor.Matching.MaskScoringMethod.DoNotScoreFeatures;
             _tool.ContrastThreshold = ContrastThreshold;
             _tool.RotationAngleMin = RotationAngleMin;
             _tool.RotationAngleMax = RotationAngleMax;
@@ -979,6 +1091,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         _tool.ClearPattern();
         Trained = false;
+        ResetMask();
 
         TrainRegion = null;
         SearchRegion = null;

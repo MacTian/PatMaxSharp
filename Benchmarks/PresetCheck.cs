@@ -17,11 +17,28 @@ public static class PresetCheck
     public static int? MaxFeaturesOverride;
     public static double? CoherenceOverride;
     public static double? ScaleMinOverride, ScaleMaxOverride;
+    public static string SearchMaskPath;
+    public static string TrainMaskPath;
+
+    private static (byte[] mask, int w, int h)? LoadMask(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+        var img = ImageLoader.Load(path);
+        var mask = new byte[img.Width * img.Height];
+        for (int i = 0; i < mask.Length; i++) mask[i] = img.Data[i] > 127 ? (byte)1 : (byte)0;
+        return (mask, img.Width, img.Height);
+    }
 
     private static ShapeAnchorTool MakeTool(SearchPreset preset, bool acceptAll)
     {
+        var maskInfo = LoadMask(SearchMaskPath);
+        var trainMaskInfo = LoadMask(TrainMaskPath);
         return new ShapeAnchorTool
         {
+            TrainMask = trainMaskInfo?.mask,
+            SearchMask = maskInfo?.mask,
+            SearchMaskWidth = maskInfo?.w ?? 0,
+            SearchMaskHeight = maskInfo?.h ?? 0,
             AcceptThreshold = acceptAll ? 0.0 : preset.AcceptThreshold,
             ContrastThreshold = acceptAll ? 0.0 : preset.ContrastThreshold,
             UseClutter = preset.ScoreUsingClutter,

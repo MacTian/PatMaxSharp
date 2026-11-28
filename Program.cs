@@ -18,6 +18,22 @@ bool Has(string flag) => args.Any(a => a.Equals(flag, StringComparison.OrdinalIg
 // ---------------------------------------------------------------------------
 //  --explain <image> [--preset <name>] : every refined hypothesis, ungated
 // ---------------------------------------------------------------------------
+// ---- shared overrides for the preset tools (must be parsed before any mode branch) ----
+{
+    int i;
+    if ((i = Array.FindIndex(args, a => a.Equals("--mask", StringComparison.OrdinalIgnoreCase))) > 0 && i + 1 < args.Length)
+        PresetCheck.SearchMaskPath = args[i + 1];
+    if ((i = Array.FindIndex(args, a => a.Equals("--train-mask", StringComparison.OrdinalIgnoreCase))) > 0 && i + 1 < args.Length)
+        PresetCheck.TrainMaskPath = args[i + 1];
+    if ((i = Array.FindIndex(args, a => a.Equals("--scale", StringComparison.OrdinalIgnoreCase))) > 0 && i + 2 < args.Length)
+    { PresetCheck.ScaleMinOverride = double.Parse(args[i + 1]); PresetCheck.ScaleMaxOverride = double.Parse(args[i + 2]); }
+    if ((i = Array.FindIndex(args, a => a.Equals("--coherence", StringComparison.OrdinalIgnoreCase))) > 0 && i + 1 < args.Length)
+        PresetCheck.CoherenceOverride = double.Parse(args[i + 1]);
+    if ((i = Array.FindIndex(args, a => a.Equals("--max-features", StringComparison.OrdinalIgnoreCase))) > 0 && i + 1 < args.Length)
+        PresetCheck.MaxFeaturesOverride = int.Parse(args[i + 1]);
+    if ((i = Array.FindIndex(args, a => a.Equals("--train-floor", StringComparison.OrdinalIgnoreCase))) > 0 && i + 1 < args.Length)
+        PresetCheck.TrainFloorOverride = double.Parse(args[i + 1]);
+}
 int explainIndex = Array.FindIndex(args, a => a.Equals("--explain", StringComparison.OrdinalIgnoreCase));
 if (explainIndex >= 0 && explainIndex + 1 < args.Length)
 {
@@ -39,18 +55,6 @@ if (presetIndex >= 0 && presetIndex + 1 < args.Length)
     {
         PresetCheck.List();
         return 0;
-    }
-    int tf = Array.FindIndex(args, a => a.Equals("--train-floor", StringComparison.OrdinalIgnoreCase));
-    if (tf > 0 && tf + 1 < args.Length) PresetCheck.TrainFloorOverride = double.Parse(args[tf + 1]);
-    int mf = Array.FindIndex(args, a => a.Equals("--max-features", StringComparison.OrdinalIgnoreCase));
-    if (mf > 0 && mf + 1 < args.Length) PresetCheck.MaxFeaturesOverride = int.Parse(args[mf + 1]);
-    int co = Array.FindIndex(args, a => a.Equals("--coherence", StringComparison.OrdinalIgnoreCase));
-    if (co > 0 && co + 1 < args.Length) PresetCheck.CoherenceOverride = double.Parse(args[co + 1]);
-    int sc = Array.FindIndex(args, a => a.Equals("--scale", StringComparison.OrdinalIgnoreCase));
-    if (sc > 0 && sc + 2 < args.Length)
-    {
-        PresetCheck.ScaleMinOverride = double.Parse(args[sc + 1]);
-        PresetCheck.ScaleMaxOverride = double.Parse(args[sc + 2]);
     }
     PresetCheck.Run(args[presetIndex + 1],
         args.Any(a => a.Equals("--detail", StringComparison.OrdinalIgnoreCase)));

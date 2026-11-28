@@ -410,9 +410,32 @@
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                 <RadioButton x:Name="rbTrain" Content="选择训练区" IsChecked="True"/>
                                 <RadioButton x:Name="rbSearch" Content="选择搜索区"/>
+                                <RadioButton x:Name="rbMask" Content="涂抹掩膜"/>
                             </StackPanel>
                             <TextBlock Style="{StaticResource hint}" Margin="2,6,2,0"
-                                       Text="在左侧图片上按住左键拖出矩形；滚轮缩放。"/>
+                                       Text="掩膜 = 原版的 Care / Don't Care：红色区域不参与训练与评分（忽略背景文字、杂波、反光）。"/>
+                            <TextBlock Style="{StaticResource hint}" Margin="2,6,2,0"
+                                       Text="在图片上按住左键拖出矩形；滚轮缩放。"/>
+                            <Border Background="#1F1F23" BorderBrush="{StaticResource BBorder}" BorderThickness="1"
+                                    CornerRadius="3" Padding="6" Margin="2,8,2,0">
+                                <StackPanel>
+                                    <CheckBox Content="启用掩膜（训练 + 运行）" IsChecked="{Binding UseMask}"/>
+                                    <TextBlock Text="{Binding MaskSummary}" Style="{StaticResource hint}"/>
+                                    <TextBlock Text="{Binding BrushRadius, StringFormat='笔刷半径：{0:F0} px'}"
+                                               Style="{StaticResource lbl}"/>
+                                    <Slider Minimum="2" Maximum="60" Value="{Binding BrushRadius}" TickFrequency="2"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Content="擦除（标为 Don''t care）" IsChecked="{Binding MaskErase}"
+                                                  ToolTip="勾选=涂抹的区域被忽略；取消=涂抹的区域恢复参与"/>
+                                        <Button Content="清空掩膜" Command="{Binding ClearMaskCommand}" Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Text="运行时被掩特征的计分方式" Style="{StaticResource lbl}"/>
+                                    <ComboBox SelectedIndex="{Binding MaskScoringIndex}">
+                                        <ComboBoxItem Content="不计分 DoNotScoreFeatures"/>
+                                        <ComboBoxItem Content="记为杂波 ScoreFeaturesAsClutter"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Expander>
 
@@ -552,6 +575,9 @@
                             Markers="{Binding Markers}"
                             PatternOutline="{Binding PatternOutline}"
                             OriginPoint="{Binding OriginPoint}"
+                            MaskBytes="{Binding Mask}"
+                            BrushRadius="{Binding BrushRadius}"
+                            MaskErase="{Binding MaskErase}"
                             ShowTrainRegion="{Binding ShowTrainRegion}"
                             ImageWidth="{Binding ImagePixelWidth}"
                             ImageHeight="{Binding ImagePixelHeight}"/>

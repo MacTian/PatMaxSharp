@@ -141,6 +141,20 @@ public sealed class ShapeAnchorTool
     public bool IgnorePolarity { get; set; }
 
     /// <summary>
+    /// Care / Don't-care mask used for training, one byte per pixel of the training image,
+    /// 0 = Don't care (CogPMAlignPattern.TrainImageMask). Null trains on the whole region.
+    /// </summary>
+    public byte[] TrainMask { get; set; }
+
+    /// <summary>Run-time mask (CogPMAlignRunParams.SearchImageMask). Null scores the whole image.</summary>
+    public byte[] SearchMask { get; set; }
+    public int SearchMaskWidth { get; set; }
+    public int SearchMaskHeight { get; set; }
+
+    /// <summary>DoNotScoreFeatures (default) or ScoreFeaturesAsClutter.</summary>
+    public ShapeAnchor.Matching.MaskScoringMethod MaskScoring { get; set; }
+
+    /// <summary>
     /// Training-side edge floor as a fraction of the strongest edge in the region (0..0.95).
     /// Higher values keep only the strong geometric edges and drop shading gradients, which is what
     /// makes a model survive a change of illumination. Maps to TrainOptions.ContrastThreshold.
@@ -206,7 +220,7 @@ public sealed class ShapeAnchorTool
             N = ScoreExponentN,
             IgnorePolarity = IgnorePolarity
         };
-        Pattern = PatternTrainer.Train(image, roi, originX, originY, EdgeDetector, opt);
+        Pattern = PatternTrainer.Train(image, roi, originX, originY, EdgeDetector, opt, TrainMask);
         return Pattern;
     }
 
@@ -316,6 +330,10 @@ public sealed class ShapeAnchorTool
         SubpixelRefinement = SubpixelRefinement,
         OverlapSuppression = 0.55,
         MinSeparationPixels = Separations(),
+        SearchMask = SearchMask,
+        SearchMaskWidth = SearchMaskWidth,
+        SearchMaskHeight = SearchMaskHeight,
+        MaskScoring = MaskScoring,
         // Ignoring polarity must not mean "anything with edges is fine": an instance whose
         // contrast is inverted is still coherent (~1.0), a wrong pose is not (~0.5).
         MinPolarityCoherence = Pattern != null && Pattern.PolarityAgnostic && MinPolarityCoherence < 0

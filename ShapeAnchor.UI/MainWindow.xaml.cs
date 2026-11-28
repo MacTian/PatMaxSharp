@@ -47,8 +47,10 @@ public partial class MainWindow : Window
         timeText.Text = "-";
         tputText.Text = "-";
 
-        rbTrain.Checked += (_, _) => viewer.SelectMode = RegionKind.Train;
-        rbSearch.Checked += (_, _) => viewer.SelectMode = RegionKind.Search;
+        rbTrain.Checked += (_, _) => { viewer.SelectMode = RegionKind.Train; viewer.MaskEditing = false; };
+        rbSearch.Checked += (_, _) => { viewer.SelectMode = RegionKind.Search; viewer.MaskEditing = false; };
+        rbMask.Checked += (_, _) => { viewer.MaskEditing = true; _vm.UseMask = true; _vm.MaskMode = true; };
+        viewer.MaskPainted += () => _vm.RefreshMaskSummary();
 
         viewer.RegionChanged += _ => _vm.RefreshRegions();
 
