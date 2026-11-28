@@ -16,6 +16,17 @@ bool quiet = Has("--quiet");
 bool Has(string flag) => args.Any(a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
 
 // ---------------------------------------------------------------------------
+//  --presets <dir> : run every built-in preset over a folder
+// ---------------------------------------------------------------------------
+int presetIndex = Array.FindIndex(args, a => a.Equals("--presets", StringComparison.OrdinalIgnoreCase));
+if (presetIndex >= 0 && presetIndex + 1 < args.Length)
+{
+    PresetCheck.Run(args[presetIndex + 1],
+        args.Any(a => a.Equals("--detail", StringComparison.OrdinalIgnoreCase)));
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 //  --probe <image> [x y w h] : train one region and explain the outcome
 // ---------------------------------------------------------------------------
 int probeIndex = Array.FindIndex(args, a => a.Equals("--probe", StringComparison.OrdinalIgnoreCase));

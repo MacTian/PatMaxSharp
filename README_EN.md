@@ -167,7 +167,7 @@ So the demo settings (contrast 0, clutter off) trade discrimination for recall; 
 
 | Parameter | Default | Effect |
 |---|---|---|
-| `AcceptThreshold` | 0.5 | Minimum `Score` for a result to be accepted |
+| `AcceptThreshold` | 0.70 | Minimum `Score` for a result to be accepted |
 | `CoarseAcceptThreshold` | 0.33 | Coarse-stage prefilter gate; below it a hypothesis is not refined |
 | `ContrastThreshold` | 0.08 | Normalised contrast gate: response relative to the 80th percentile of that level's edge magnitudes; weaker responses do not match |
 | `ScoreExponentN` | 2.0 | Score exponent denominator: `score = coverage^(1/N)` |
@@ -205,6 +205,58 @@ The original defaults were read from the ECMA-335 metadata and `[DefaultValue]` 
 | `IgnorePolarity` false | `IgnorePolarity` false | Identical |
 | `TimeoutMs` (0 = unlimited) | `Timeout` 5000 / `TimeoutEnabled` false | Same semantics, unlimited by default |
 | Not wired up (PatMax path only) | `TrainAlgorithm` 2 = `PatMaxAndPatQuick`, `RunAlgorithm` 2 = `BestTrained` | Same-named enums exist: `TrainAlgorithmConstants` / `RunAlgorithmConstants` |
+
+### 9.3 Presets (measured)
+
+The preset catalog lives in the library (`Core/SearchPreset.cs`). The UI drop-down and the command
+line read the same table, so every number below can be reproduced with
+`dotnet run -c Release -- --presets <folder>`.
+
+| Preset | For | What differs |
+|---|---|---|
+| General (default) | the starting point for most work | 360° search, no scale search, threshold 0.70, clutter scored |
+| Small-angle fast | fixture already oriented, ±10° only | smallest angle space, fastest; frames outside the window are rejected by design |
+| High precision (slow) | metrology-grade readings | coarse step 1, 1200 features, 1.5 px spacing, threshold 0.75, ±30°, scale 0.95–1.05 |
+| Wide angle + scale | any pose and a size difference | ±180°, scale 0.9–1.1 |
+| Reflection / silhouette | contrast polarity flips | `IgnorePolarity`, threshold raised to 0.80 (0.65 accepted confidently wrong poses) |
+| Dark / low contrast | underexposed frames | automatic edge threshold, floor 4, threshold 0.60 |
+| Multi-target | several parts per frame | expect 5, up to 20 results, XY overlap 0.3, threshold 0.60 |
+
+`D:\FTP\calibration` (12 standard parts, all expected at ≥0.9):
+
+| Preset | Found | ≥0.90 |
+|---|---|---|
+| General (default) | 11/12 | 11 |
+| Small-angle fast | 10/12 (the two ±60° frames rejected by design) | 10 |
+| High precision (slow) | 10/12 (same two) | 10 |
+| Wide angle + scale | 12/12 | 12 |
+| Reflection / silhouette | 12/12 | 12 |
+| Dark / low contrast | 12/12 | 11 |
+| Multi-target | 12/12 | 11 |
+
+`D:\FTP\patmax` (17 real frames: dark, backlit, plastic bags, structured clutter, multiple parts):
+
+| Preset | Found | Mean | Max instances |
+|---|---|---|---|
+| General (default) | 10/17 | 0.961 | 1 |
+| Small-angle fast | 9/17 | 0.979 | 1 |
+| High precision (slow) | 6/17 | 0.959 | 1 |
+| Wide angle + scale | 11/17 | 0.947 | 1 |
+| Reflection / silhouette | 12/17 | 0.939 | 4 |
+| Dark / low contrast | 13/17 | 0.884 | 2 |
+| Multi-target | 11/17 | 0.932 | 2 |
+
+What the numbers say:
+
+- The default preset holds up on both sets: 11/12 on standard parts, 10/17 on the challenge set (the
+  seven misses are frames with no usable edges, or parts clipped/occluded).
+- **Small-angle fast really does reject out-of-window frames.** This used to be a bug: refinement
+  walked the angle out of the configured window, so a ±10° search still returned a part at −36°.
+  Fixed in `SearchEngine.InAngleWindow`.
+- **The reflection preset must not be permissive.** At 0.65 it accepted poses at 79° and 159° that
+  are plainly wrong; at 0.80 it finds 12/17 instead of 16/17 — fewer answers, none of them wrong.
+- The multi-target instance ceiling depends on how much the parts occlude each other (4 on the
+  challenge set; an unoccluded tray image yields more).
 
 ## 10. Binary forensics and what they do not prove
 

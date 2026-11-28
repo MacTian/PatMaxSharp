@@ -803,7 +803,9 @@ public sealed class SearchEngine
             Scale = scale,
             MatchedFeatures = matched,
             BadFeatures = bad,
-            Accepted = score >= opt.AcceptThreshold && contrast >= opt.ContrastThreshold,
+            Accepted = score >= opt.AcceptThreshold
+                    && contrast >= opt.ContrastThreshold
+                    && InAngleWindow(NormalizeAngle(angle) * 180.0 / Math.PI, opt.AngleMin, opt.AngleMax),
             FitError = fitError,
             Clutter = clutterFraction
         };
@@ -946,6 +948,7 @@ public sealed class SearchEngine
         foreach (var r in input)
         {
             if (!r.Accepted) continue;
+            if (!InAngleWindow(r.Angle * 180.0 / Math.PI, opt.AngleMin, opt.AngleMax)) continue;
             bool overlaps = false;
             foreach (var k in kept)
             {
@@ -955,6 +958,24 @@ public sealed class SearchEngine
             if (!overlaps) kept.Add(r);
         }
         return kept;
+    }
+
+    /// <summary>
+    /// Whether a reported angle lies inside the configured search window. Refinement is free to
+    /// walk the angle away from the coarse grid, and it used to walk straight out of the window:
+    /// a +-10 deg search still returned a part at -36 deg. Reported poses are now restricted to
+    /// what the caller asked to look for.
+    /// </summary>
+    private static bool InAngleWindow(double degrees, double min, double max)
+    {
+        double lo = Math.Min(min, max), hi = Math.Max(min, max);
+        if (hi - lo >= 359.999) return true;
+        for (int k = -1; k <= 1; k++)
+        {
+            double a = degrees + 360.0 * k;
+            if (a >= lo - 1e-6 && a <= hi + 1e-6) return true;
+        }
+        return false;
     }
 
     private static double NormalizeAngle(double a)

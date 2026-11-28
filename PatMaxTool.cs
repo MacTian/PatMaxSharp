@@ -140,6 +140,20 @@ public sealed class PatMaxTool
     /// <summary>Ignore edge polarity when training (CogPMAlignPattern.IgnorePolarity).</summary>
     public bool IgnorePolarity { get; set; }
 
+    /// <summary>Automatic edge threshold (adapts the floor to the image contrast).</summary>
+    public bool AutoEdgeThreshold
+    {
+        get => EdgeDetector.AutoNoiseFloor;
+        set => EdgeDetector.AutoNoiseFloor = value;
+    }
+
+    /// <summary>Edge threshold sent to the detector (the original EdgeThreshold).</summary>
+    public double EdgeThreshold
+    {
+        get => EdgeDetector.NoiseFloor;
+        set => EdgeDetector.NoiseFloor = value;
+    }
+
     /// <summary>Gradient magnitude below which nothing is considered an edge.</summary>
     public double NoiseFloor
     {
