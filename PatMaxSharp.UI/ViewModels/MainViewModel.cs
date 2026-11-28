@@ -631,14 +631,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             double originX = Math.Clamp(OriginX - r.X, 0, crop.Width - 1);
             double originY = Math.Clamp(OriginY - r.Y, 0, crop.Height - 1);
 
-            _tool.EdgeDetector.UseSimd = UseSimd;
-            _tool.EdgeDetector.UseParallel = UseParallel;
-            _tool.EdgeDetector.NoiseFloor = EdgeThreshold;
-            _tool.EdgeDetector.AutoNoiseFloor = AutoEdgeThreshold;
-            _tool.IgnorePolarity = IgnorePolarity;
-            _tool.TrainMaxFeatures = Math.Max(20, TrainMaxFeatures);
-            _tool.TrainMinSpacing = Math.Max(1.0, TrainMinSpacing);
-            var pattern = _tool.Train(crop, originX, originY, Grain);
+            var pattern = TrainWithPanel(crop, new RectI(0, 0, crop.Width, crop.Height), originX, originY);
 
             // A region over plain background yields no features. Say so instead of leaving a
             // model that later fails with the bare "pattern not trained" from the engine.
@@ -691,9 +684,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             var baseImage = ImageLoader.Load(files[0]);
             var roi = PatternTrainer.ContentBounds(baseImage);
 
-            _tool.EdgeDetector.UseSimd = UseSimd;
-            _tool.EdgeDetector.UseParallel = UseParallel;
-            var pattern = _tool.Train(baseImage, roi, roi.X + (roi.Width - 1) / 2.0, roi.Y + (roi.Height - 1) / 2.0, Grain);
+            var pattern = TrainWithPanel(baseImage, roi,
+                roi.X + (roi.Width - 1) / 2.0, roi.Y + (roi.Height - 1) / 2.0);
             // batch/review use the region centre as origin by definition
             TrainRegion = new Rect(roi.X, roi.Y, roi.Width, roi.Height);
             OriginFollowsCenter = true;
@@ -714,13 +706,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
             var watch = System.Diagnostics.Stopwatch.StartNew();
             int found = 0;
             var csv = new System.Text.StringBuilder();
-            csv.AppendLine("image,score,x,y,angle_deg,scale,coverage,matched,bad,accepted,time_ms");
+            csv.AppendLine("image,score,x,y,angle_deg,scale,coverage,matched,bad,accepted,time_ms,instances");
 
             foreach (var file in files)
             {
                 var gray = ImageLoader.Load(file);
                 var one = System.Diagnostics.Stopwatch.StartNew();
-                var r = _tool.Run(gray, 1);
+                int want = Math.Max(1, Math.Max(MaxResults, ApproximateNumberToFind));
+                var r = _tool.Run(gray, want);
                 one.Stop();
                 string name = System.IO.Path.GetFileName(file);
 
@@ -732,12 +725,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
                     found++;
                     csv.AppendLine($"{name},{m.Score:F3},{m.X:F2},{m.Y:F2},{m.AngleDegrees:F2}," +
                                    $"{m.Scale:F3},{m.Coverage:P1},{m.MatchedFeatures},{m.BadFeatures}," +
-                                   $"{m.Accepted},{one.Elapsed.TotalMilliseconds:F1}");
+                                   $"{m.Accepted},{one.Elapsed.TotalMilliseconds:F1},{r.Count}");
                 }
                 else
                 {
                     Results.Add(new MatchResult { ModelId = name + "  —  无结果", Score = 0, Accepted = false });
-                    csv.AppendLine($"{name},0,,,,,,,,{one.Elapsed.TotalMilliseconds:F1}");
+                    csv.AppendLine($"{name},0,,,,,,,,{one.Elapsed.TotalMilliseconds:F1},0");
                 }
             }
             watch.Stop();
@@ -773,9 +766,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
             var baseImage = ImageLoader.Load(files[0]);
             var roi = PatternTrainer.ContentBounds(baseImage);
-            _tool.EdgeDetector.UseSimd = UseSimd;
-            _tool.EdgeDetector.UseParallel = UseParallel;
-            var pattern = _tool.Train(baseImage, roi, roi.X + (roi.Width - 1) / 2.0, roi.Y + (roi.Height - 1) / 2.0, Grain);
+            var pattern = TrainWithPanel(baseImage, roi,
+                roi.X + (roi.Width - 1) / 2.0, roi.Y + (roi.Height - 1) / 2.0);
             // batch/review use the region centre as origin by definition
             TrainRegion = new Rect(roi.X, roi.Y, roi.Width, roi.Height);
             OriginFollowsCenter = true;
@@ -857,6 +849,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _tool.ScaleMax = ScaleMax;
         _tool.MaxCandidates = Math.Clamp(Math.Max(8, MaxResults * 2), 8, 32);
         _tool.UseClutter = ScoreUsingClutter;
+        _tool.TimeoutMs = TimeoutMs;
+        _tool.XYOverlap = XYOverlap;
+    }
+
+    /// <summary>
+    /// Train applying every training-parameter control. Single-image training, the batch check
+    /// and the review walk all go through here, so the panel means the same thing in each.
+    /// </summary>
+    private PatternModel TrainWithPanel(GrayImage image, RectI roi, double originX, double originY)
+    {
+        _tool.EdgeDetector.UseSimd = UseSimd;
+        _tool.EdgeDetector.UseParallel = UseParallel;
+        _tool.EdgeDetector.NoiseFloor = EdgeThreshold;
+        _tool.EdgeDetector.AutoNoiseFloor = AutoEdgeThreshold;
+        _tool.IgnorePolarity = IgnorePolarity;
+        _tool.TrainMaxFeatures = Math.Max(20, TrainMaxFeatures);
+        _tool.TrainMinSpacing = Math.Max(1.0, TrainMinSpacing);
+        return _tool.Train(image, roi, originX, originY, Grain);
     }
 
     private void Run()

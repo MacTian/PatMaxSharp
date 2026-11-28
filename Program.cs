@@ -52,6 +52,13 @@ if (calIndex >= 0)
     bool ncc = args.Any(a => a.Equals("--ncc", StringComparison.OrdinalIgnoreCase));   // opt-in
     bool ignorePolarity = args.Any(a => a.Equals("--ignore-polarity", StringComparison.OrdinalIgnoreCase));
     bool cognexPreset = args.Any(a => a.Equals("--cognex-demo", StringComparison.OrdinalIgnoreCase));
+    int angleIdx = Array.FindIndex(args, a => a.Equals("--angle", StringComparison.OrdinalIgnoreCase));
+    if (angleIdx > 0 && angleIdx + 2 < args.Length)
+    {
+        CalibrationCheck.AngleMin = double.Parse(args[angleIdx + 1]);
+        CalibrationCheck.AngleMax = double.Parse(args[angleIdx + 2]);
+        Console.WriteLine($"[cal] angle override {CalibrationCheck.AngleMin}..{CalibrationCheck.AngleMax}");
+    }
     CalibrationCheck.Run(directory, preview: true, autoNoiseFloor: autoFloor, normalizedCorrelation: ncc,
         ignorePolarity: ignorePolarity, cognexDemoPreset: cognexPreset);
     return 0;

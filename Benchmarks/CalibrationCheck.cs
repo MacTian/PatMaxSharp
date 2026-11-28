@@ -17,6 +17,10 @@ namespace PatMaxSharp.Benchmarks;
 /// </summary>
 public static class CalibrationCheck
 {
+    /// <summary>Optional angular window override (command line), so a folder can be checked
+    /// under the same restriction the UI would apply.</summary>
+    public static double? AngleMin;
+    public static double? AngleMax;
     public static void Run(string directory, bool preview, bool autoNoiseFloor = true, bool normalizedCorrelation = false,
         bool ignorePolarity = false, bool cognexDemoPreset = false)
     {
@@ -62,7 +66,10 @@ public static class CalibrationCheck
             tool.IgnorePolarity = true;
         }
         Console.WriteLine($"[cal] preset  = {(cognexDemoPreset ? "Cognex demo (angle +-45, scale 0.6-1.6, contrast 0, clutter off, find 3)" : "library defaults")}");
-        Console.WriteLine($"[cal] options = autoNoiseFloor:{autoNoiseFloor}  normalizedCorrelation:{normalizedCorrelation}  ignorePolarity:{ignorePolarity}");
+        if (AngleMin.HasValue) tool.RotationAngleMin = AngleMin.Value;
+        if (AngleMax.HasValue) tool.RotationAngleMax = AngleMax.Value;
+        Console.WriteLine($"[cal] options = autoNoiseFloor:{autoNoiseFloor}  normalizedCorrelation:{normalizedCorrelation}  " +
+                          $"ignorePolarity:{ignorePolarity}  angle {tool.RotationAngleMin:F0}..{tool.RotationAngleMax:F0}");
         tool.NormalizedCorrelation = normalizedCorrelation;
         tool.IgnorePolarity = ignorePolarity;
 

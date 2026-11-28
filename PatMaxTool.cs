@@ -87,6 +87,12 @@ public sealed class PatMaxTool
     public double ClusterRadius { get; set; } = 8.0;
 
     /// <summary>
+    /// Allowed overlap between two reported instances (Cognex XYOverlap, 0 = disjoint,
+    /// 1 = may fully overlap). Converted to a centre distance using the model diameter.
+    /// </summary>
+    public double XYOverlap { get; set; } = 0.5;
+
+    /// <summary>
     /// Extra Gaussian blur applied before edge extraction. Only used when the value is above
     /// 0.6, so the 0.5 default leaves the image untouched (edge extraction already smooths
     /// with its derivative-of-Gaussian kernel).
@@ -252,6 +258,19 @@ public sealed class PatMaxTool
         return image;
     }
 
+    /// <summary>Centre distance below which two results count as the same instance.</summary>
+    private double Separations()
+    {
+        double sep = EnableClustering ? Math.Max(0, ClusterRadius) : 0;
+        if (Pattern != null && Pattern.Trained)
+        {
+            // overlap 0.5 means centres may sit a quarter of the diameter apart
+            double fromOverlap = Pattern.Diameter * (1.0 - Math.Clamp(XYOverlap, 0.0, 1.0)) * 0.5;
+            sep = Math.Max(sep, fromOverlap);
+        }
+        return sep;
+    }
+
     private SearchOptions BuildOptions(int maxResults) => new()
     {
         AngleMin = RotationAngleMin,
@@ -269,7 +288,7 @@ public sealed class PatMaxTool
         CoarseAngleStepDeg = CoarseAngleStepDeg,
         SubpixelRefinement = SubpixelRefinement,
         OverlapSuppression = 0.55,
-        MinSeparationPixels = EnableClustering ? Math.Max(0, ClusterRadius) : 0.0,
+        MinSeparationPixels = Separations(),
         UseClutter = UseClutter,
         NormalizedCorrelation = NormalizedCorrelation,
         MaxLevels = MaxLevels,
